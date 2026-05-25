@@ -1,0 +1,29 @@
+# Entornos virtuales
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Archivos de sistema y logs
+.DS_Store
+.DS_Store?
+ehthumbs.db
+Icon?
+Thumbs.db
+*.log
+
+# Entornos e IDEs
+.vscode/
+.idea/
+.Rhistory
+.RData
+.Ruserdata
+
+# Bases de datos temporales
+*.db
+*.sqlite
