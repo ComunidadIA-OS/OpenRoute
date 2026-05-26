@@ -27,7 +27,7 @@ export function Sidebar({ user }: Props) {
   }
 
   return (
-    <aside className="w-60 shrink-0 border-r bg-slate-50 dark:bg-slate-900 flex flex-col">
+    <aside className="w-60 shrink-0 border-r bg-slate-50 dark:bg-slate-900 flex flex-col h-full">
       <div className="px-5 py-5 border-b">
         <div className="flex items-center gap-2.5">
           <div className="rounded-md bg-white p-1 ring-1 ring-[#1a531a]/20">
