@@ -1,0 +1,17 @@
+# OpenRoute - backend de optimización
+# Python 3.9+
+
+# Datos
+numpy>=1.26
+pandas>=2.2.0
+
+# Optimización VRP
+ortools>=9.10.4067
+
+# UI Streamlit (gestor de flota)
+streamlit>=1.35.0
+folium>=0.17.0
+streamlit-folium>=0.20.0
+
+# Llamada a Ollama (LLM local, open source)
+requests>=2.31.0
