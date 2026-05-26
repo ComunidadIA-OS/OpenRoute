@@ -2,7 +2,6 @@
 // summary (LLM doesn't need full DB objects - we condense to relevant fields).
 
 import { prisma } from "../prisma";
-import { osrmRoute } from "../osrm";
 import { suggestRoutes, rescheduleRoute, type RouteOption } from "../optimize";
 
 const DEPOT_LAT = parseFloat(process.env.DEPOT_LAT || "38.3460");

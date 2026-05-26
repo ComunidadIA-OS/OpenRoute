@@ -1,7 +1,7 @@
 // Route optimization using OSRM /trip (TSP solver) + sector filtering.
 // Generates 2-3 alternative routes for the chatbot to propose.
 
-import { osrmTrip, osrmRoute, type TripResult } from "./osrm";
+import { osrmTrip, type TripResult } from "./osrm";
 import { prisma } from "./prisma";
 
 const DEPOT_LAT = parseFloat(process.env.DEPOT_LAT || "38.3460");
