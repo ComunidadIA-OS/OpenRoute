@@ -1,0 +1,31 @@
+id_pedido,cliente,direccion,lat,lon,prioridad,peso_kg,franja_inicio,franja_fin,observaciones
+PED-001,Panadería Altabix,Calle Bernabé del Campo Latorre 12 Elche,38.2725,-0.6782,2,15.5,09:00,12:00,Entregar antes del mediodía
+PED-002,Cafetería UMH,Avenida de la Universidad s/n Elche,38.2750,-0.6870,3,40.0,09:00,11:00,Carga prioritaria de café
+PED-003,Farmacia Carrús,Calle Diagonal 45 Elche,38.2810,-0.6990,1,10.0,09:00,18:00,Medicamentos no urgentes
+PED-004,Restaurante Matola,Carretera de la Hoya 14 Elche,38.2420,-0.7250,2,85.0,14:00,17:00,Producto fresco refrigerado
+PED-005,Supermercado Sector V,Calle Capitán Antonio Mena 89 Elche,38.2580,-0.7020,3,120.0,09:00,13:00,Requiere transpaleta
+PED-006,Tienda Centro Elche,Calle Corredora 22 Elche,38.2680,-0.6980,2,25.0,09:00,14:00,Zona peatonal accesible
+PED-007,Ferretería El Toscar,Calle Emilio Hernández Selva 102 Elche,38.2770,-0.7080,1,60.0,09:00,18:00,Material de obra pesado
+PED-008,Clínica Raval,Calle Boix y Rosario 5 Elche,38.2630,-0.6950,2,8.0,14:00,18:00,Entregar en recepción
+PED-009,Papelería Palmeral,Paseo de la Estación 15 Elche,38.2690,-0.6890,1,12.0,09:00,18:00,Cajas de folios
+PED-010,Frutería La Hoya,Avenida de la Hoya 3 Elche,38.2450,-0.6550,2,95.0,09:00,12:00,Fruta de temporada
+PED-011,Café Carolinas,Calle San Mateo 42 Alicante,38.3580,-0.4850,2,18.0,09:00,13:00,Café molido
+PED-012,Gimnasio Babel,Calle México 18 Alicante,38.3310,-0.5050,3,75.0,09:00,12:00,Discos y mancuernas
+PED-013,Hotel Alicante Centro,Calle Gerona 5 Alicante,38.3450,-0.4880,3,110.0,09:00,11:00,Ropa de cama limpia urgencia
+PED-014,Boutique Maisonnave,Avenida de Maisonnave 33 Alicante,38.3430,-0.4920,1,14.0,09:00,18:00,Moda de temporada
+PED-015,Restaurante El Puerto,Muelle de Levante s/n Alicante,38.3410,-0.4810,2,90.0,14:00,18:00,Pescado fresco del día
+PED-016,Librería San Blas,Calle Pintor Gisbert 8 Alicante,38.3470,-0.5010,1,22.0,09:00,18:00,Libros escolares
+PED-017,Clínica Vistahermosa,Avenida de Denia 103 Alicante,38.3680,-0.4680,2,30.0,10:00,14:00,Material quirúrgico
+PED-018,Taller La Florida,Calle Asturias 12 Alicante,38.3370,-0.5110,1,55.0,09:00,18:00,Repuestos de motor
+PED-019,Hogar Albufereta,Calle Sol Naciente 2 Alicante,38.3650,-0.4510,2,45.0,14:00,18:00,Mobiliario pequeño
+PED-020,Supermercado Miriam Blasco,Avenida de la Condomina 45 Alicante,38.3690,-0.4350,3,130.0,09:00,13:00,Palets de leche
+PED-021,Carnicería Altabix,Calle Diagonal 10 Elche,38.2740,-0.6810,2,35.0,09:00,13:00,Carne fresca
+PED-022,Floristería Centro,Calle Mayor de la Vila 8 Elche,38.2675,-0.6975,1,5.0,09:00,18:00,Flores delicadas
+PED-023,Restaurante Carrús,Calle de la Reina Victoria 120 Elche,38.2710,-0.7040,2,50.0,14:00,17:00,Bebidas y barriles
+PED-024,Óptica San José,Calle Menéndez y Pelayo 34 Elche,38.2620,-0.7050,1,3.0,09:00,18:00,Gafas graduadas
+PED-025,Pescadería Elche,Avenida de Novelda 55 Elche,38.2830,-0.7010,3,70.0,09:00,11:00,Pescado para restaurantes
+PED-026,Juguetería Alicante,Calle San Vicente 60 Alicante,38.3490,-0.4870,1,28.0,09:00,18:00,Juguetes varios
+PED-027,Panadería Florida,Calle Orihuela 78 Alicante,38.3350,-0.5180,2,20.0,09:00,12:00,Pan de molde artesano
+PED-028,Farmacia San Vicente,Calle Ancha de Castelar 10 San Vicente del Raspeig,38.3950,-0.5210,1,12.0,09:00,18:00,Medicamentos generales
+PED-029,Restaurante UMH Elche,Avenida de la Universidad s/n Edificio Rectorado Elche,38.2760,-0.6860,3,65.0,11:00,14:00,Suministros comedor universitario
+PED-030,Residencia San Lucas,Calle Doctor Waksman 2 Elche,38.2650,-0.6820,3,80.0,09:00,13:00,Suministros médicos prioritarios
