@@ -1,0 +1,149 @@
+// OpenRoute2 - schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  passwordHash String
+  fullName     String
+  role         String // ADMIN | DRIVER
+  vehicleId    String?       @unique
+  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
+  routes       Route[]
+  chatSessions ChatSession[]
+  createdAt    DateTime      @default(now())
+}
+
+model Vehicle {
+  id          String  @id @default(cuid())
+  plate       String  @unique
+  capacityKg  Float   @default(800)
+  capacityVol Float   @default(10)
+  driver      User?
+  routes      Route[]
+  available   Boolean @default(true)
+}
+
+model Customer {
+  id     String  @id @default(cuid())
+  name   String
+  phone  String?
+  email  String?
+  orders Order[]
+}
+
+model Order {
+  id             String     @id @default(cuid())
+  code           String     @unique
+  customerId     String
+  customer       Customer   @relation(fields: [customerId], references: [id])
+  street         String
+  number         String
+  city           String     @default("Alicante")
+  postalCode     String?
+  lat            Float?
+  lng            Float?
+  weightKg       Float      @default(5)
+  volume         Float      @default(0.1)
+  status         String     @default("PENDING") // PENDING|DISPATCHED|IN_TRANSIT|DELIVERED|FAILED|RESCHEDULED
+  windowStart    DateTime
+  windowEnd      DateTime
+  plannedArrival DateTime?
+  notes          String?
+  routeStop      RouteStop?
+  incidents      Incident[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@index([status])
+  @@index([windowStart])
+}
+
+model Route {
+  id            String      @id @default(cuid())
+  code          String      @unique
+  date          DateTime
+  driverId      String?
+  driver        User?       @relation(fields: [driverId], references: [id])
+  vehicleId     String?
+  vehicle       Vehicle?    @relation(fields: [vehicleId], references: [id])
+  status        String      @default("PLANNED") // PLANNED|ACTIVE|COMPLETED|CANCELLED
+  startDepotLat Float
+  startDepotLng Float
+  totalDistance Float?
+  totalDuration Int?
+  polyline      String?
+  stops         RouteStop[]
+  incidents     Incident[]
+  createdAt     DateTime    @default(now())
+}
+
+model RouteStop {
+  id             String    @id @default(cuid())
+  routeId        String
+  route          Route     @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  orderId        String    @unique
+  order          Order     @relation(fields: [orderId], references: [id])
+  sequence       Int
+  etaPlanned     DateTime
+  etaActual      DateTime?
+  status         String    @default("PENDING") // PENDING|ARRIVED|DELIVERED|FAILED|SKIPPED
+  serviceTimeSec Int       @default(180)
+
+  @@index([routeId, sequence])
+}
+
+model Incident {
+  id           String    @id @default(cuid())
+  type         String // VEHICLE_BREAKDOWN|UNDELIVERABLE|TRAFFIC|CUSTOMER_ABSENT|OTHER
+  status       String    @default("OPEN") // OPEN|RESOLVED
+  description  String
+  durationMin  Int?
+  orderId      String?
+  order        Order?    @relation(fields: [orderId], references: [id])
+  routeId      String?
+  route        Route?    @relation(fields: [routeId], references: [id])
+  reportedById String?
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id])
+  title     String?
+  messages  ChatMessage[]
+  createdAt DateTime      @default(now())
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role       String // user | assistant | tool | system
+  content    String
+  toolCalls  String? // JSON
+  toolCallId String?
+  toolName   String?
+  createdAt  DateTime    @default(now())
+
+  @@index([sessionId, createdAt])
+}
+
+model GeocodeCache {
+  id        String   @id @default(cuid())
+  query     String   @unique
+  lat       Float
+  lng       Float
+  raw       String?
+  createdAt DateTime @default(now())
+}
