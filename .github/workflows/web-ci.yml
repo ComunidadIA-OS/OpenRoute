@@ -1,0 +1,62 @@
+name: Web CI
+
+# Valida el frontend Next.js en cada PR que toque web/ o el propio workflow,
+# y en cada push directo a main que afecte a web/. El backend Python se valida
+# en su propio workflow (ver py-ci.yml cuando exista).
+
+on:
+  pull_request:
+    paths:
+      - "web/**"
+      - ".github/workflows/web-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/web-ci.yml"
+
+jobs:
+  lint-typecheck-build:
+    name: Lint, type-check y build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Generar Prisma Client
+        run: npx prisma generate
+
+      - name: Lint con ESLint
+        run: npm run lint
+
+      - name: Type-check con TypeScript
+        run: npx tsc --noEmit
+
+      - name: Build de producción Next.js
+        run: npm run build
+        env:
+          # Valores dummy solo para que el build no falle por falta de envs.
+          # En producción se inyectan via secrets / variables del despliegue.
+          DATABASE_URL: "file:./ci.db"
+          JWT_SECRET: "ci-only-dummy-secret-not-used-in-prod"
+          OLLAMA_BASE_URL: "http://localhost:11434"
+          OLLAMA_MODEL: "llama3.1:8b"
+          OSRM_BASE_URL: "https://router.project-osrm.org"
+          NOMINATIM_BASE_URL: "https://nominatim.openstreetmap.org"
+          DEPOT_LAT: "38.3460"
+          DEPOT_LNG: "-0.4907"

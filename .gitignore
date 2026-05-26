@@ -7,20 +7,22 @@ __pycache__/
 *.so
 
 # Distribution / packaging
+# Nota: usamos rutas absolutas (/) para que las reglas Python solo apliquen
+# al root del repo y no a subdirectorios como web/src/lib/.
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+/share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -216,3 +218,61 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ────────────────────────────────────────────────────────────
+# Frontend Next.js (web/)
+# ────────────────────────────────────────────────────────────
+
+# Node dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# Next.js build output
+.next/
+out/
+build/
+
+# Env y secretos del frontend (NUNCA subir)
+web/.env
+web/.env.local
+web/.env.*.local
+web/.env.development
+web/.env.production
+
+# Bases de datos locales (cada uno hace su seed)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Test artifacts y archivos temporales
+.cookies.tmp
+*.tmp
+
+# TypeScript / Prisma generados
+*.tsbuildinfo
+next-env.d.ts
+web/src/generated/
+
+# Coverage / testing JS
+coverage/
+.nyc_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Vercel
+.vercel/
+
+# Claude Code workspace
+.claude/
