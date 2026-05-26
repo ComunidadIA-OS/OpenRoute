@@ -25,6 +25,22 @@ export type ToolResult = {
   uiHint?: { kind: string; payload: unknown }; // For UI to render a card
 };
 
+// llama3.1:8b a veces envuelve los argumentos numéricos como strings.
+// Esta función coerciona de forma segura, devolviendo undefined si no se puede.
+function toNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === "") return undefined;
+  if (typeof value === "number" && !isNaN(value)) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    // Aceptar tanto "20" como "20 minutos" extrayendo el primer número.
+    const match = trimmed.match(/-?\d+(?:[.,]\d+)?/);
+    if (!match) return undefined;
+    const n = parseFloat(match[0].replace(",", "."));
+    return isNaN(n) ? undefined : n;
+  }
+  return undefined;
+}
+
 function fmtTime(d: Date | string | null): string {
   if (!d) return "—";
   const dt = typeof d === "string" ? new Date(d) : d;
@@ -236,7 +252,7 @@ export const TOOL_HANDLERS: Record<
       if (isNaN(date.getTime())) date = new Date();
     }
     date.setHours(0, 0, 0, 0);
-    const maxStops = (args.maxStops as number) || 10;
+    const maxStops = toNumber(args.maxStops) ?? 10;
 
     const options = await suggestRoutes(date, maxStops);
     const dateOut = date.toISOString().slice(0, 10);
@@ -468,7 +484,7 @@ export const TOOL_HANDLERS: Record<
         type,
         status: "OPEN",
         description,
-        durationMin: (args.durationMin as number) ?? null,
+        durationMin: toNumber(args.durationMin) ?? null,
         orderId,
         routeId,
         reportedById: ctx.userId,
@@ -486,8 +502,10 @@ export const TOOL_HANDLERS: Record<
 
   reschedule_route: async (args, ctx) => {
     const code = args.routeCode as string;
-    const delay = args.delayMinutes as number;
-    if (!code || delay == null) return { ok: false, error: "Faltan routeCode o delayMinutes" };
+    const delay = toNumber(args.delayMinutes);
+    if (!code || delay == null || isNaN(delay)) {
+      return { ok: false, error: "Faltan routeCode o delayMinutes (debe ser un número de minutos)" };
+    }
 
     const route = await prisma.route.findFirst({
       where: { OR: [{ code }, { id: code }] },
