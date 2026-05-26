@@ -225,5 +225,4 @@ Eres libre de usar, modificar y distribuir este software, incluso comercialmente
 ##  Contacto
 
 - Issues y discusiones técnicas → [GitHub Issues](../../issues)
-- Hackathon → [comunidad.ia.os@digital.gob.es](mailto:comunidad.ia.os@digital.gob.es)
-- Discord de la Comunidad IA de Código Abierto → ver [portal SEDIA](https://digital.gob.es)
+- AUTORES →  [David Morales](juandmg020407@gmail.com) [Samuel Parra](parrasamuel453@gmail.com) [Giulian Peterlecean](giulian.peterlecean@gmail.com)
