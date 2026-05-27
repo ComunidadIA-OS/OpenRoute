@@ -140,6 +140,13 @@ def _build_dataframes(req: OptimizeRequest) -> tuple[pd.DataFrame, pd.DataFrame,
 def _serialize_plan(plan: dict) -> dict:
     """Convierte numpy types a tipos JSON-friendly."""
     def _coerce(v):
+        # Booleanos PRIMERO: en numpy 1.x np.bool_ no es subclase de np.integer,
+        # pero en numpy 2.x sí lo es (y un check de np.integer convertiría True
+        # a 1). Manejarlo antes garantiza que el bool sigue siendo bool en el
+        # JSON. Importante: el bug histórico "'numpy.bool' object is not
+        # iterable" en FastAPI venía exactamente de esta omisión.
+        if isinstance(v, (bool, np.bool_)):
+            return bool(v)
         if isinstance(v, np.integer):
             return int(v)
         if isinstance(v, np.floating):
