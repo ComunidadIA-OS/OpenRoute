@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Package, MessageSquare, Route, LogOut } from "lucide-react";
+import { Package, MessageSquare, Route, LogOut, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -12,6 +12,7 @@ type Props = {
 
 const NAV = [
   { href: "/orders", label: "Pedidos", icon: Package },
+  { href: "/import", label: "Importar CSV", icon: Upload },
   { href: "/chat", label: "Chatbot", icon: MessageSquare },
   { href: "/routes", label: "Rutas", icon: Route },
 ];
