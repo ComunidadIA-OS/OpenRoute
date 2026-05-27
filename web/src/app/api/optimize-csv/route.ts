@@ -67,6 +67,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // bbox es opcional: default | worldwide | "lat_min,lat_max,lon_min,lon_max".
+  // El backend Python lo valida en detalle (formato, rangos); aquí sólo
+  // verificamos que sea un string razonable antes de reenviar.
+  const bboxRaw = formData.get("bbox");
+  const bbox =
+    typeof bboxRaw === "string" && bboxRaw.trim() !== "" ? bboxRaw.trim() : null;
+
   // Reconstruimos el FormData para el upstream: FastAPI espera el mismo
   // nombre de campo ('files') repetido por cada archivo. No basta con
   // reenviar el FormData del cliente porque entre runtimes puede perder
@@ -74,6 +81,7 @@ export async function POST(req: NextRequest) {
   const upstream = new FormData();
   upstream.set("mode", mode);
   if (useOsrm) upstream.set("use_osrm", useOsrm);
+  if (bbox) upstream.set("bbox", bbox);
   for (const f of fileList) {
     upstream.append("files", f, f.name);
   }

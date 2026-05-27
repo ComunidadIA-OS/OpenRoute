@@ -125,6 +125,8 @@ type Combined = {
 type OptimizeResponse = {
   mode: "ortools" | "heuristic";
   use_osrm_requested: string | null;
+  /** Bbox aplicado realmente: [lat_min, lat_max, lon_min, lon_max]. */
+  bbox_used: [number, number, number, number];
   individual: IndividualEntry[];
   combined: Combined | null;
 };
@@ -152,11 +154,13 @@ function fmtPct(x: number) {
 // ─── Página ────────────────────────────────────────────────────────
 
 type MatrixMode = "auto" | "true" | "false";
+type BboxMode = "default" | "worldwide";
 
 export default function ImportPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<"ortools" | "heuristic">("ortools");
   const [matrixMode, setMatrixMode] = useState<MatrixMode>("auto");
+  const [bboxMode, setBboxMode] = useState<BboxMode>("default");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
@@ -210,6 +214,7 @@ export default function ImportPage() {
     const fd = new FormData();
     fd.append("mode", mode);
     fd.append("use_osrm", matrixMode);
+    fd.append("bbox", bboxMode);
     for (const f of files) fd.append("files", f, f.name);
 
     try {
@@ -363,6 +368,26 @@ export default function ImportPage() {
               </Select>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Zona geográfica</label>
+              <Select
+                value={bboxMode}
+                onValueChange={(v) => setBboxMode(v as BboxMode)}
+              >
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">
+                    Alicante / Elche (default)
+                  </SelectItem>
+                  <SelectItem value="worldwide">
+                    Sin restricción (acepta cualquier coord.)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button
               onClick={handleOptimize}
               disabled={loading || files.length === 0}
@@ -408,15 +433,23 @@ export default function ImportPage() {
 function ResultsView({ result }: { result: OptimizeResponse }) {
   const okCount = result.individual.filter(isIndividualOk).length;
   const errCount = result.individual.length - okCount;
+  const [latMin, latMax, lonMin, lonMax] = result.bbox_used;
+  const isWorldwide =
+    latMin <= -89 && latMax >= 89 && lonMin <= -179 && lonMax >= 179;
+  const bboxLabel = isWorldwide
+    ? "sin restricción"
+    : `lat ${latMin.toFixed(2)}..${latMax.toFixed(2)}, lon ${lonMin.toFixed(2)}..${lonMax.toFixed(2)}`;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
         <CheckCircle2 className="h-4 w-4 text-[#1a531a]" />
         <span>
           {okCount} archivo{okCount === 1 ? "" : "s"} procesado
           {okCount === 1 ? "" : "s"} con motor <strong>{result.mode}</strong>
           {errCount > 0 && ` · ${errCount} con error`}
+          {" · zona: "}
+          <code className="text-xs">{bboxLabel}</code>
         </span>
       </div>
 
