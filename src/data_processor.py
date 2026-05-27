@@ -169,25 +169,17 @@ class DataProcessor:
 
 
 if __name__ == "__main__":
-    # Test sencillo de ejecución local
+    # Smoke test contra el dataset por defecto del repo.
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(here, os.pardir))
+
     processor = DataProcessor()
-    workspace_dir = "/Users/samuelparraechague/Developer/3_Workspace_Cloudecode"
-    
-    try:
-        orders = processor.load_orders(os.path.join(workspace_dir, "data/pedidos_ejemplo.csv"))
-        vehicles = processor.load_vehicles(os.path.join(workspace_dir, "data/vehiculos_config.json"))
-        
-        print(f"Pedidos cargados exitosamente: {len(orders)} registros.")
-        print(f"Vehículos de flota cargados: {len(vehicles)} vehículos.")
-        
-        # Probar matriz de distancias para el depósito del primer vehículo
-        dep_lat = vehicles.loc[0, 'deposito_lat']
-        dep_lon = vehicles.loc[0, 'deposito_lon']
-        dist, times = processor.build_distance_matrix(dep_lat, dep_lon, orders)
-        
-        print(f"Matriz de distancias construida con dimensiones: {dist.shape}")
-        print(f"Distancia depósito -> Primer pedido: {dist[0, 1]:.2f} km")
-        print(f"Tiempo estimado depósito -> Primer pedido: {times[0, 1]:.2f} min")
-        
-    except Exception as e:
-        print(f"Error durante pruebas: {e}")
+    orders = processor.load_orders(os.path.join(repo_root, "data", "pedidos_ejemplo.csv"))
+    vehicles = processor.load_vehicles(os.path.join(repo_root, "data", "vehiculos_config.json"))
+
+    print(f"Pedidos cargados: {len(orders)} | Vehículos: {len(vehicles)}")
+
+    dep_lat = vehicles.loc[0, "deposito_lat"]
+    dep_lon = vehicles.loc[0, "deposito_lon"]
+    dist, times = processor.build_distance_matrix(dep_lat, dep_lon, orders)
+    print(f"Matriz {dist.shape} | depot->P1: {dist[0, 1]:.2f} km, {times[0, 1]:.1f} min")

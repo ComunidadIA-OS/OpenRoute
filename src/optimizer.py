@@ -4,42 +4,39 @@ from abc import ABC, abstractmethod
 from ortools.constraint_solver import routing_enums_pb2
 from ortools.constraint_solver import pywrapcp
 
+# Factores de CO2 (g/km).
+# Diésel: media medida en furgonetas N1 de reparto cargadas (no turismo ligero).
+# Eléctrico: derivado del mix eléctrico español 2024 (~150 g CO2/kWh) y consumo
+# típico de furgoneta eléctrica (~25 kWh/100 km) = 37.5 g/km. Redondeado a 40.
+# Cero NO es realista: ignora la huella del mix de generación.
+CO2_DIESEL_VAN_G_PER_KM = 250.0
+CO2_ELECTRIC_VAN_G_PER_KM = 40.0
+
+
 class RouteOptimizer(ABC):
-    """
-    Interfaz abstracta para los resolvedores de optimización de rutas.
-    Define el contrato estándar para garantizar la modularidad del código (Patrón Strategy).
-    """
+    """Interfaz Strategy de los resolvedores. Output unificado documentado en
+    docs/BACKEND_INTEGRATION.md."""
+
     @abstractmethod
     def optimize(self, orders_df, vehicles_df, dist_matrix, time_matrix):
-        """
-        Ejecuta la optimización y devuelve un diccionario con el formato unificado:
-        {
-            'tipo_planificacion': 'Nombre del resolvedor',
-            'vehiculos_activos': int,
-            'distancia_total_km': float,
-            'tiempo_total_horas': float,
-            'coste_total_euros': float,
-            'co2_total_kg': float,
-            'pedidos_retrasados': int,
-            'incidentes_sobrecarga': int,
-            'rutas': [...]
-        }
-        """
         pass
 
 
 class HeuristicRouteOptimizer(RouteOptimizer):
+    """Resolvedor heurístico: K-Means geográfico + Vecino Más Cercano ponderado por prioridad.
+
+    Útil como fallback rápido y como baseline algorítmico (no humano — para baseline
+    humano ver metrics.MetricsEngine.simulate_manual_baseline).
     """
-    Resolvedor basado en una heurística propia académica desarrollada para demostrar
-    conceptos de Ciencia de Datos y Estructuras de Datos.
-    Utiliza:
-    1. Clustering Geográfico (K-Means en coordenadas terrestres).
-    2. Vecino Más Cercano Ponderado por Prioridad con chequeo dinámico de restricciones (CVRPTW).
-    """
-    def __init__(self, service_time_min=10.0, co2_g_per_km_diesel=220.0, co2_g_per_km_electric=0.0):
+
+    def __init__(self, service_time_min=10.0,
+                 co2_g_per_km_diesel=CO2_DIESEL_VAN_G_PER_KM,
+                 co2_g_per_km_electric=CO2_ELECTRIC_VAN_G_PER_KM,
+                 random_seed=42):
         self.service_time_min = service_time_min
         self.co2_g_per_km_diesel = co2_g_per_km_diesel
         self.co2_g_per_km_electric = co2_g_per_km_electric
+        self.random_seed = random_seed
 
     def _geocode_clustering(self, orders_df, num_clusters):
         """
@@ -56,8 +53,9 @@ class HeuristicRouteOptimizer(RouteOptimizer):
         # Si hay menos muestras que clusters, ajustar
         k = min(num_clusters, n_samples)
         
-        # Inicializar centroides aleatoriamente del dataset
-        np.random.seed(42) # Semilla fija para reproducibilidad en hackathon
+        # Semilla fija para reproducibilidad en evaluación. Pásala None para no fijarla.
+        if self.random_seed is not None:
+            np.random.seed(self.random_seed)
         indices = np.random.choice(n_samples, k, replace=False)
         centroids = coords[indices]
         
@@ -90,7 +88,7 @@ class HeuristicRouteOptimizer(RouteOptimizer):
                 'tipo_planificacion': 'Heurística Propia (Clustering + VMC Ponderado)',
                 'vehiculos_activos': 0, 'distancia_total_km': 0.0, 'tiempo_total_horas': 0.0,
                 'coste_total_euros': 0.0, 'co2_total_kg': 0.0, 'pedidos_retrasados': 0,
-                'incidentes_sobrecarga': 0, 'rutas': []
+                'incidentes_sobrecarga': 0, 'rutas': [], 'used_fallback': False,
             }
 
         # 1. Agrupar pedidos geográficamente
@@ -134,45 +132,26 @@ class HeuristicRouteOptimizer(RouteOptimizer):
                 best_candidate = None
                 best_score = float('inf')
                 
-                # Evaluar todos los candidatos no visitados
+                # Evaluar todos los candidatos no visitados.
+                # Score = distancia / prioridad^1.5 + penalización por retraso.
+                # Prioridad ALTA = número ALTO (3 = urgente, 1 = no urgente) → eleva
+                # el denominador y reduce el score, favoreciendo el candidato.
                 for cand in unvisited:
                     order_row = orders_df.iloc[cand]
                     cand_node = cand + 1
-                    
-                    # Chequear restricciones duras en la heurística
-                    # 1. Capacidad
-                    cand_load = current_load + order_row['peso_kg']
-                    if cand_load > vehicle['capacidad_kg']:
-                        # Si supera la capacidad de este viaje, esta heurística lo pospone
-                        # o genera sobrecarga simulada marcada en el log
-                        pass 
-                    
-                    # Distancias y tiempos
+
                     dist = dist_matrix[current_node, cand_node]
                     time_needed = time_matrix[current_node, cand_node]
-                    
-                    # Tiempo estimado de llegada
                     eta = current_time + time_needed
-                    
-                    # Ventana de tiempo: Llegar tarde penaliza mucho el score
                     delay = max(0.0, eta - order_row['minutos_fin'])
-                    
-                    # Heurística: El score combina Distancia Física, Prioridad y Retraso
-                    # Score = Distancia / (Prioridad ^ 1.5) + Penalización por retraso
+
                     priority_factor = float(order_row['prioridad']) ** 1.5
-                    
-                    # Calculamos el coste ponderado heurístico
                     score = (dist / priority_factor) + (delay * 5.0)
-                    
+
                     if score < best_score:
                         best_score = score
                         best_candidate = cand
-                        
-                if best_candidate is None:
-                    # No quedan candidatos válidos (o hubo problemas de restricciones)
-                    # En una heurística simple, tomamos el que quede de todos modos para no dejar pedidos sin entregar
-                    best_candidate = list(unvisited)[0]
-                    
+
                 cand_order_row = orders_df.iloc[best_candidate]
                 cand_node = best_candidate + 1
                 
@@ -206,7 +185,9 @@ class HeuristicRouteOptimizer(RouteOptimizer):
                     'prioridad': int(cand_order_row['prioridad']),
                     'peso_kg': float(cand_order_row['peso_kg']),
                     'hora_llegada': arrival_time_str,
-                    'retrasado': is_delayed,
+                    # bool() necesario: comparaciones con pandas devuelven numpy.bool_
+                    # que rompe json.dumps cuando ai_assistant lo serializa al LLM.
+                    'retrasado': bool(is_delayed),
                     'ventana': f"{cand_order_row['franja_inicio']}-{cand_order_row['franja_fin']}"
                 })
                 
@@ -245,7 +226,7 @@ class HeuristicRouteOptimizer(RouteOptimizer):
                 'tiempo_viaje_min': route_time_travel,
                 'coste_euros': cost,
                 'co2_emissions_kg': co2_emissions_kg,
-                'sobrecargado': is_overloaded,
+                'sobrecargado': bool(is_overloaded),
                 'carga_total_kg': current_load,
                 'detalle_paradas': stop_details
             })
@@ -259,7 +240,8 @@ class HeuristicRouteOptimizer(RouteOptimizer):
             'co2_total_kg': sum(r['co2_emissions_kg'] for r in routes_summary),
             'pedidos_retrasados': total_delayed,
             'incidentes_sobrecarga': total_overloaded_incidents,
-            'rutas': routes_summary
+            'rutas': routes_summary,
+            'used_fallback': False,
         }
 
     def _minutes_to_time_str(self, minutes):
@@ -268,22 +250,38 @@ class HeuristicRouteOptimizer(RouteOptimizer):
 
 
 class ORToolsRouteOptimizer(RouteOptimizer):
+    """Resolvedor CVRPTW con Google OR-Tools (capacidades + ventanas horarias).
+
+    Si OR-Tools no encuentra solución factible, cae a HeuristicRouteOptimizer y
+    marca el resultado con ``used_fallback=True`` — el cliente DEBE comprobar
+    esta flag antes de presentar el resultado como "optimizado".
     """
-    Resolvedor de optimización avanzado industrial usando Google OR-Tools.
-    Resuelve el VRPTW completo de forma global óptima.
-    """
-    def __init__(self, service_time_min=10.0, co2_g_per_km_diesel=220.0, co2_g_per_km_electric=0.0):
+
+    def __init__(self, service_time_min=10.0,
+                 co2_g_per_km_diesel=CO2_DIESEL_VAN_G_PER_KM,
+                 co2_g_per_km_electric=CO2_ELECTRIC_VAN_G_PER_KM,
+                 time_limit_seconds=10):
         self.service_time_min = service_time_min
         self.co2_g_per_km_diesel = co2_g_per_km_diesel
         self.co2_g_per_km_electric = co2_g_per_km_electric
+        self.time_limit_seconds = time_limit_seconds
 
     def optimize(self, orders_df, vehicles_df, dist_matrix, time_matrix):
         """
         Ejecuta OR-Tools para resolver el problema de rutas capacitado con ventanas de tiempo.
         """
         num_vehicles = len(vehicles_df)
-        num_nodes = len(dist_matrix) # 30 pedidos + 1 depósito
-        
+        num_nodes = len(dist_matrix)  # N pedidos + 1 depósito
+
+        # Caso degenerado: sin pedidos no hay nada que resolver.
+        if len(orders_df) == 0:
+            return {
+                'tipo_planificacion': 'Google OR-Tools (Optimizador Global CVRPTW)',
+                'vehiculos_activos': 0, 'distancia_total_km': 0.0, 'tiempo_total_horas': 0.0,
+                'coste_total_euros': 0.0, 'co2_total_kg': 0.0, 'pedidos_retrasados': 0,
+                'incidentes_sobrecarga': 0, 'rutas': [], 'used_fallback': False,
+            }
+
         # 1. Estructura de Datos para OR-Tools
         data = {}
         # Convertir distancias y tiempos a enteros (OR-Tools trabaja con enteros)
@@ -399,19 +397,29 @@ class ORToolsRouteOptimizer(RouteOptimizer):
         search_parameters.local_search_metaheuristic = (
             routing_enums_pb2.LocalSearchMetaheuristic.GUIDED_LOCAL_SEARCH
         )
-        search_parameters.time_limit.seconds = 2 # Límite de tiempo rápido para hackathon
+        search_parameters.time_limit.seconds = self.time_limit_seconds
         
         # 8. Resolver
         solution = routing.SolveWithParameters(search_parameters)
         
         # 9. Procesar y unificar salida
         if not solution:
-            # Fallback en caso de que no haya solución factible por restricciones duras de ventanas
-            # en el hackathon, esto puede pasar si el CSV tiene ventanas imposibles.
-            # En ese caso, relajamos restricciones o ejecutamos la Heurística Propia.
-            print("Advertencia: OR-Tools no encontró una solución factible con restricciones duras. Ejecutando Heurística Propia de respaldo.")
-            fallback = HeuristicRouteOptimizer(self.service_time_min, self.co2_g_per_km_diesel, self.co2_g_per_km_electric)
-            return fallback.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
+            # OR-Tools no encontró solución factible (ventanas imposibles, capacidad
+            # insuficiente, etc.). Caemos a la heurística para no devolver vacío, pero
+            # MARCAMOS el resultado con used_fallback=True para que el cliente sepa
+            # que NO es un resultado del solver industrial.
+            print(
+                "[OR-Tools] Sin solución factible — fallback a heurística. "
+                "Revisar ventanas horarias y capacidades del dataset."
+            )
+            fallback = HeuristicRouteOptimizer(
+                self.service_time_min, self.co2_g_per_km_diesel, self.co2_g_per_km_electric
+            )
+            result = fallback.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
+            result['used_fallback'] = True
+            result['fallback_reason'] = "ortools_infeasible"
+            # Mantenemos tipo_planificacion del fallback para que sea evidente en logs.
+            return result
             
         routes_summary = []
         total_km = 0.0
@@ -452,7 +460,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                         'prioridad': int(order_row['prioridad']),
                         'peso_kg': float(order_row['peso_kg']),
                         'hora_llegada': arrival_time_str,
-                        'retrasado': is_delayed,
+                        'retrasado': bool(is_delayed),
                         'ventana': f"{order_row['franja_inicio']}-{order_row['franja_fin']}"
                     })
                     route_stops.append(node_idx - 1)
@@ -486,7 +494,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                     'tiempo_viaje_min': max(0.0, (end_time_min - vehicle_row['minutos_inicio']) - (len(route_stops) * self.service_time_min)),
                     'coste_euros': cost,
                     'co2_emissions_kg': co2_emissions_kg,
-                    'sobrecargado': is_overloaded,
+                    'sobrecargado': bool(is_overloaded),
                     'carga_total_kg': current_load,
                     'detalle_paradas': stop_details
                 })
@@ -503,7 +511,8 @@ class ORToolsRouteOptimizer(RouteOptimizer):
             'co2_total_kg': sum(r['co2_emissions_kg'] for r in routes_summary),
             'pedidos_retrasados': total_delayed,
             'incidentes_sobrecarga': total_overloaded_incidents,
-            'rutas': routes_summary
+            'rutas': routes_summary,
+            'used_fallback': False,
         }
 
     def _minutes_to_time_str(self, minutes):
@@ -511,11 +520,9 @@ class ORToolsRouteOptimizer(RouteOptimizer):
         return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
-# --- CLASE FACHADA O CONTENEDORA (FACTORY) ---
 class RouteOptimizerFactory:
-    """
-    Patrón Factory para instanciar fácilmente el resolvedor deseado.
-    """
+    """Factory para instanciar el resolvedor deseado."""
+
     @staticmethod
     def get_optimizer(mode="ortools", service_time_min=10.0):
         if mode == "ortools":
