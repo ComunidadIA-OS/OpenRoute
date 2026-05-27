@@ -76,9 +76,13 @@ services:
     restart: unless-stopped
 
   # ─── Servicio 3: pull del modelo (one-shot) ───────────────
-  # `ollama pull llama3.1:8b` se ejecuta una vez y termina. Necesario porque
-  # el contenedor ollama no descarga modelos por sí solo — espera órdenes.
-  # En el primer arranque tarda ~5-10 min según la red.
+  # `ollama pull` se ejecuta una vez y termina. Necesario porque el
+  # contenedor ollama no descarga modelos por sí solo — espera órdenes.
+  #
+  # llama3.2:3b en lugar de llama3.1:8b: pesa ~2 GB en RAM en lugar de
+  # ~5 GB, responde 3× más rápido en CPU, y mantiene tool-calling nativo.
+  # Crítico para la demo en Docker Desktop sin GPU: el 8b se quedaba sin
+  # memoria y Docker lo mataba (fetch failed en el front).
   ollama-pull:
     image: ollama/ollama:latest
     container_name: openroute-ollama-pull
@@ -92,8 +96,8 @@ services:
       - |
         echo "[ollama-pull] Esperando que el daemon de Ollama responda..."
         until ollama list >/dev/null 2>&1; do sleep 2; done
-        echo "[ollama-pull] Descargando llama3.1:8b (~5 GB, primera vez)..."
-        ollama pull llama3.1:8b
+        echo "[ollama-pull] Descargando llama3.2:3b (~2 GB, primera vez)..."
+        ollama pull llama3.2:3b
         echo "[ollama-pull] Modelo listo. Saliendo."
     # Punto de partida que apunta al daemon del otro contenedor.
     environment:
@@ -116,7 +120,7 @@ services:
       # Los nombres de servicio funcionan como hostname dentro de la red
       # de Docker; no son URLs públicas.
       OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "llama3.1:8b"
+      OLLAMA_MODEL: "llama3.2:3b"
       OPTIMIZER_BASE_URL: "http://optimizer:8000"
       OSRM_BASE_URL: "https://router.project-osrm.org"
       NOMINATIM_BASE_URL: "https://nominatim.openstreetmap.org"
