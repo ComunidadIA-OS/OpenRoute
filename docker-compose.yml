@@ -1,0 +1,140 @@
+# OpenRoute — orquestación local con Docker Compose.
+#
+# Arranca los tres servicios necesarios para tener la aplicación funcionando
+# desde cero. Pensado para que el jurado del hackathon (o cualquier pyme)
+# pueda probar OpenRoute sin instalar nada local — solo Docker.
+#
+# Uso:
+#   docker compose up --build           # construye e inicia todo
+#   docker compose up -d                # en segundo plano
+#   docker compose logs -f web          # ver logs del frontend
+#   docker compose down                 # parar (mantiene volúmenes)
+#   docker compose down -v              # parar y borrar DB + caches
+#
+# Primera ejecución:
+#   1. Ollama tarda en descargar llama3.1:8b (~5 GB). Mientras tanto, el
+#      frontend está vivo pero el chatbot devolverá error de "Ollama no
+#      responde". El servicio `ollama-pull` se encarga del download.
+#   2. El frontend crea la SQLite y siembra los usuarios demo en el primer
+#      arranque (ver web/docker-entrypoint.sh).
+#
+# Endpoints:
+#   - Frontend Next.js : http://localhost:3000
+#   - FastAPI optimizer : http://localhost:8000 (docs en /docs)
+#   - Ollama           : http://localhost:11434
+
+services:
+  # ─── Servicio 1: motor VRP (FastAPI + OR-Tools) ───────────
+  optimizer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: openroute/optimizer:latest
+    container_name: openroute-optimizer
+    ports:
+      - "8000:8000"
+    environment:
+      # CORS limitado al frontend; el jurado puede ampliarlo si hace pruebas
+      # desde otro host.
+      OPENROUTE_CORS_ORIGINS: "http://localhost:3000"
+      # Bbox por defecto del dataset de demo (Alicante/Elche). Una pyme
+      # de otra zona puede sobreescribirlo aquí sin tocar código.
+      # Ejemplo Sevilla: OPENROUTE_BBOX: "37.0,38.0,-6.5,-5.5"
+      # Para aceptar coordenadas de cualquier zona del mundo:
+      # OPENROUTE_BBOX: "worldwide"
+      OPENROUTE_BBOX: "37.5,39.5,-1.5,0.5"
+      # OSRM público. Para producción, considerar auto-hospedar OSRM.
+      OSRM_BASE_URL: "https://router.project-osrm.org"
+    volumes:
+      # Permite a la pyme sustituir el dataset de demo (data/) por el suyo
+      # sin reconstruir la imagen. Comentar para usar el dataset incluido.
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # ─── Servicio 2: Ollama (LLM local) ───────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: openroute-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persistimos los modelos descargados entre reinicios. Sin esto,
+      # cada `compose up` se vuelve a bajar los 5 GB de llama3.1:8b.
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ─── Servicio 3: pull del modelo (one-shot) ───────────────
+  # `ollama pull llama3.1:8b` se ejecuta una vez y termina. Necesario porque
+  # el contenedor ollama no descarga modelos por sí solo — espera órdenes.
+  # En el primer arranque tarda ~5-10 min según la red.
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: openroute-ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama-models:/root/.ollama
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[ollama-pull] Esperando que el daemon de Ollama responda..."
+        until ollama list >/dev/null 2>&1; do sleep 2; done
+        echo "[ollama-pull] Descargando llama3.1:8b (~5 GB, primera vez)..."
+        ollama pull llama3.1:8b
+        echo "[ollama-pull] Modelo listo. Saliendo."
+    # Punto de partida que apunta al daemon del otro contenedor.
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    restart: "no"
+
+  # ─── Servicio 4: frontend conversacional (Next.js) ────────
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: openroute/web:latest
+    container_name: openroute-web
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "file:/app/prisma/dev.db"
+      # En producción, generar uno aleatorio: openssl rand -base64 32
+      JWT_SECRET: "compose-dev-secret-rotate-in-production"
+      # Los nombres de servicio funcionan como hostname dentro de la red
+      # de Docker; no son URLs públicas.
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "llama3.1:8b"
+      OPTIMIZER_BASE_URL: "http://optimizer:8000"
+      OSRM_BASE_URL: "https://router.project-osrm.org"
+      NOMINATIM_BASE_URL: "https://nominatim.openstreetmap.org"
+      DEPOT_LAT: "38.3460"
+      DEPOT_LNG: "-0.4907"
+    volumes:
+      # Volumen para la DB SQLite — sobrevive a `compose down` (pero no a
+      # `compose down -v`). Si quieres reset total, borra el volumen.
+      - web-data:/app/prisma
+    depends_on:
+      optimizer:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  # Modelos descargados de Ollama. Pesado (~5 GB) pero crítico.
+  ollama-models:
+  # Base de datos SQLite del frontend con usuarios + pedidos demo seedeados.
+  web-data:
