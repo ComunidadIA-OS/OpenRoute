@@ -70,6 +70,7 @@ Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el detalle técnico.
 * `pandas` y `numpy` para procesamiento de datos.
 * [Google OR-Tools](https://developers.google.com/optimization) (CVRPTW industrial) en `src/optimizer.py`.
 * Heurística académica propia (K-Means + Vecino Más Cercano Ponderado) como alternativa.
+* Matriz de distancias **OSRM `/table`** por defecto (callejero real); fallback automático a Haversine × factor urbano si OSRM no responde (`src/osrm_client.py`). Desactivable con `OPENROUTE_DISABLE_OSRM=1` para entornos sin red.
 * Cliente Ollama propio en `src/ai_assistant.py` para generar informes en lenguaje natural.
 
 Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

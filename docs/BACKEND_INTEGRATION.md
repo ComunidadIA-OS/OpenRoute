@@ -19,8 +19,15 @@ otro componente Python.
 - `data/vehiculos_config.json` — Configuración de capacidades de flota y
   tipos de vehículos (Diésel/Eléctrico/Apoyo).
 - `src/data_processor.py` — Carga y limpieza de datos, y cálculo de
-  matrices de distancia/tiempo (Haversine ajustada por factor 1.3× para
-  reflejar el callejero urbano).
+  matrices de distancia/tiempo. Por defecto consulta **OSRM `/table`**
+  para obtener tiempos y distancias reales por calle; si OSRM no
+  responde (sin red, rate-limit, servicio caído) cae a una matriz
+  Haversine × 1.3 como fallback determinista. El llamador puede
+  forzar uno u otro vía `use_osrm=True|False`.
+- `src/osrm_client.py` — Cliente `/table` con caché en memoria por
+  hash de coordenadas. Mismo patrón que el cliente TS de
+  `web/src/lib/osrm.ts`. Se desactiva globalmente con la env var
+  `OPENROUTE_DISABLE_OSRM=1` (útil en CI sin red).
 - `src/optimizer.py` — Resolvedores duales con patrón Strategy:
   - **Heurística Propia**: clustering geográfico + Vecino Más Cercano
     Ponderado por prioridad.
