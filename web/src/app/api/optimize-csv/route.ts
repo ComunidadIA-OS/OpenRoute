@@ -53,12 +53,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // use_osrm es opcional: auto (default) | true | false. El backend Python
+  // ya valida el valor; aquí solo lo limpiamos y lo reenviamos si está.
+  const useOsrmRaw = formData.get("use_osrm");
+  const useOsrm =
+    typeof useOsrmRaw === "string" && useOsrmRaw.trim() !== ""
+      ? useOsrmRaw.trim().toLowerCase()
+      : null;
+  if (useOsrm && !["auto", "true", "false"].includes(useOsrm)) {
+    return NextResponse.json(
+      { error: `use_osrm inválido: '${useOsrm}'. Valores: auto | true | false.` },
+      { status: 400 },
+    );
+  }
+
   // Reconstruimos el FormData para el upstream: FastAPI espera el mismo
   // nombre de campo ('files') repetido por cada archivo. No basta con
   // reenviar el FormData del cliente porque entre runtimes puede perder
   // metadatos del Blob/File.
   const upstream = new FormData();
   upstream.set("mode", mode);
+  if (useOsrm) upstream.set("use_osrm", useOsrm);
   for (const f of fileList) {
     upstream.append("files", f, f.name);
   }

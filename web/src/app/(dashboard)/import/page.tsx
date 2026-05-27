@@ -20,6 +20,7 @@ import {
   Loader2,
   Info,
   Calendar,
+  Route as RouteIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -90,11 +91,14 @@ type DeferredOrder = {
   motivo: string;
 };
 
+type MatrixSource = "osrm" | "haversine" | "unknown";
+
 type IndividualOk = {
   filename: string;
   rows_raw: number;
   rows_loaded: number;
   rows_discarded: number;
+  matrix_source: MatrixSource;
   baseline: PythonPlan;
   optimized: PythonPlan;
   savings: PythonSavings;
@@ -109,6 +113,7 @@ type IndividualEntry = IndividualOk | IndividualError;
 type Combined = {
   files: string[];
   total_rows: number;
+  matrix_source: MatrixSource;
   baseline: PythonPlan;
   optimized: PythonPlan;
   savings: PythonSavings;
@@ -119,6 +124,7 @@ type Combined = {
 
 type OptimizeResponse = {
   mode: "ortools" | "heuristic";
+  use_osrm_requested: string | null;
   individual: IndividualEntry[];
   combined: Combined | null;
 };
@@ -145,9 +151,12 @@ function fmtPct(x: number) {
 
 // ─── Página ────────────────────────────────────────────────────────
 
+type MatrixMode = "auto" | "true" | "false";
+
 export default function ImportPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [mode, setMode] = useState<"ortools" | "heuristic">("ortools");
+  const [matrixMode, setMatrixMode] = useState<MatrixMode>("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
@@ -200,6 +209,7 @@ export default function ImportPage() {
 
     const fd = new FormData();
     fd.append("mode", mode);
+    fd.append("use_osrm", matrixMode);
     for (const f of files) fd.append("files", f, f.name);
 
     try {
@@ -334,6 +344,25 @@ export default function ImportPage() {
               </Select>
             </div>
 
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Matriz de distancias</label>
+              <Select
+                value={matrixMode}
+                onValueChange={(v) => setMatrixMode(v as MatrixMode)}
+              >
+                <SelectTrigger className="w-[280px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    Auto (OSRM si responde, si no Haversine)
+                  </SelectItem>
+                  <SelectItem value="true">OSRM (real por calles)</SelectItem>
+                  <SelectItem value="false">Haversine (sin red, aprox.)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <Button
               onClick={handleOptimize}
               disabled={loading || files.length === 0}
@@ -392,7 +421,11 @@ function ResultsView({ result }: { result: OptimizeResponse }) {
       </div>
 
       {result.combined && (
-        <CombinedCard combined={result.combined} mode={result.mode} />
+        <CombinedCard
+          combined={result.combined}
+          mode={result.mode}
+          useOsrmRequested={result.use_osrm_requested}
+        />
       )}
 
       <div className="space-y-4">
@@ -401,7 +434,11 @@ function ResultsView({ result }: { result: OptimizeResponse }) {
         </h2>
         {result.individual.map((entry, i) =>
           isIndividualOk(entry) ? (
-            <IndividualCard key={i} entry={entry} />
+            <IndividualCard
+              key={i}
+              entry={entry}
+              useOsrmRequested={result.use_osrm_requested}
+            />
           ) : (
             <ErrorCard key={i} filename={entry.filename} error={entry.error} />
           ),
@@ -414,19 +451,22 @@ function ResultsView({ result }: { result: OptimizeResponse }) {
 function CombinedCard({
   combined,
   mode,
+  useOsrmRequested,
 }: {
   combined: Combined;
   mode: "ortools" | "heuristic";
+  useOsrmRequested: string | null;
 }) {
   return (
     <Card className="border-[#1a531a]/30 bg-[#1a531a]/5">
       <CardHeader>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Calendar className="h-5 w-5 text-[#1a531a]" />
           <CardTitle className="text-lg">
             Análisis combinado · {combined.files.length} CSVs · {combined.total_rows}{" "}
             pedidos
           </CardTitle>
+          <MatrixSourceBadge source={combined.matrix_source} />
         </div>
         <CardDescription>
           Todos los pedidos planificados como una sola jornada. Útil para medir el ahorro
@@ -434,6 +474,10 @@ function CombinedCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <OsrmDegradedBanner
+          requested={useOsrmRequested}
+          actual={combined.matrix_source}
+        />
         <FallbackBanner
           used={combined.used_fallback}
           reason={combined.fallback_reason}
@@ -457,14 +501,21 @@ function CombinedCard({
   );
 }
 
-function IndividualCard({ entry }: { entry: IndividualOk }) {
+function IndividualCard({
+  entry,
+  useOsrmRequested,
+}: {
+  entry: IndividualOk;
+  useOsrmRequested: string | null;
+}) {
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2 flex-wrap">
             <FileText className="h-4 w-4 text-slate-500" />
             {entry.filename}
+            <MatrixSourceBadge source={entry.matrix_source} />
           </CardTitle>
           <span className="text-xs text-muted-foreground">
             {entry.rows_loaded} pedido{entry.rows_loaded === 1 ? "" : "s"} válido
@@ -475,6 +526,10 @@ function IndividualCard({ entry }: { entry: IndividualOk }) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <OsrmDegradedBanner
+          requested={useOsrmRequested}
+          actual={entry.matrix_source}
+        />
         <FallbackBanner
           used={entry.used_fallback}
           reason={entry.fallback_reason}
@@ -511,6 +566,54 @@ function ErrorCard({ filename, error }: { filename: string; error: string }) {
         <p className="text-sm text-red-900 dark:text-red-200">{error}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function MatrixSourceBadge({ source }: { source: MatrixSource }) {
+  if (source === "osrm") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 text-xs font-medium">
+        <RouteIcon className="h-3 w-3" />
+        OSRM (real)
+      </span>
+    );
+  }
+  if (source === "haversine") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2 py-0.5 text-xs font-medium">
+        Haversine (aprox.)
+      </span>
+    );
+  }
+  return null;
+}
+
+function OsrmDegradedBanner({
+  requested,
+  actual,
+}: {
+  requested: string | null;
+  actual: MatrixSource;
+}) {
+  // Sólo avisamos cuando el usuario pidió "auto" y el motor cayó a Haversine,
+  // o cuando pidió explícitamente OSRM y el backend devolvió Haversine (no
+  // debería ocurrir con use_osrm=true porque el backend propaga la excepción,
+  // pero lo cubrimos por defensa).
+  if (actual !== "haversine") return null;
+  if (requested !== "auto" && requested !== "true") return null;
+  return (
+    <div className="rounded-md border border-blue-300 bg-blue-50 dark:bg-blue-950/20 p-3 text-sm flex items-start gap-2">
+      <Info className="h-4 w-4 mt-0.5 text-blue-700 shrink-0" />
+      <div className="text-blue-900 dark:text-blue-200">
+        <p className="font-medium">Matriz aproximada por Haversine</p>
+        <p className="text-blue-800 dark:text-blue-300 mt-1">
+          OSRM público no respondió, así que el plan se ha calculado con
+          distancias geodésicas × factor urbano. El resultado es razonable pero
+          puede desviarse 10–30% del callejero real. Comprueba la conexión o
+          relanza la optimización pasados unos segundos.
+        </p>
+      </div>
+    </div>
   );
 }
 
