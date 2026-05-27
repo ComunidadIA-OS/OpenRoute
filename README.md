@@ -78,7 +78,9 @@ Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ##  Guía de Instalación y Uso
 
-OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservicio Python y Ollama. En tres terminales:
+OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservicio Python y Ollama.
+
+> **Atajo (Windows)**: una vez instaladas las dependencias (pasos 2A, 2B, 2C), `.\start.ps1` desde la raíz verifica los prerrequisitos y arranca FastAPI + Next.js automáticamente. Ollama se asume corriendo como servicio. Ahorra abrir 3 terminales.
 
 ### 1. Clonar el repositorio
 ```bash
@@ -124,7 +126,7 @@ Los endpoints disponibles:
 #### Probar el motor sin UI
 
 ```bash
-# Suite unitaria (4 tests matemáticos)
+# Suite unitaria (10 tests: schema, capacidad, ventanas, fallback, comparativa)
 python -m unittest src/test_optimizer.py -v
 
 # Test end-to-end con reporte comparativo en consola

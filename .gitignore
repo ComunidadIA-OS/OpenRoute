@@ -274,5 +274,7 @@ desktop.ini
 # Vercel
 .vercel/
 
-# Claude Code workspace
+# Claude Code workspace y artefactos internos
 .claude/
+CLAUDE.md
+data/DATASET_SCHEMA.md
