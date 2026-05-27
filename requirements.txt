@@ -8,10 +8,10 @@ pandas>=2.2.0
 # Optimización VRP
 ortools>=9.10.4067
 
-# UI Streamlit (gestor de flota)
-streamlit>=1.35.0
-folium>=0.17.0
-streamlit-folium>=0.20.0
+# Microservicio HTTP (FastAPI) — expone el motor al frontend Next.js
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
 
 # Llamada a Ollama (LLM local, open source)
 requests>=2.31.0

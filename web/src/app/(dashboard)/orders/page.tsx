@@ -11,7 +11,8 @@ export default async function OrdersPage() {
     take: 500,
   });
 
-  const serialized = orders.map((o) => ({
+  type OrderWithCustomer = (typeof orders)[number];
+  const serialized = orders.map((o: OrderWithCustomer) => ({
     id: o.id,
     code: o.code,
     customer: { name: o.customer.name },

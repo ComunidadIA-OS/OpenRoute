@@ -3,6 +3,7 @@
 
 import { prisma } from "../prisma";
 import { suggestRoutes, rescheduleRoute, type RouteOption } from "../optimize";
+import { optimizeViaPython, isPythonOptimizerUp } from "../python-optimizer";
 
 const DEPOT_LAT = parseFloat(process.env.DEPOT_LAT || "38.3460");
 const DEPOT_LNG = parseFloat(process.env.DEPOT_LNG || "-0.4907");
@@ -370,6 +371,80 @@ export const TOOL_HANDLERS: Record<
     };
   },
 
+  optimize_with_ortools: async (args) => {
+    const rawDate = args.date as string | undefined;
+    let date: Date;
+    if (!rawDate || rawDate === "hoy" || rawDate === "today") {
+      date = new Date();
+    } else if (rawDate === "mañana" || rawDate === "tomorrow") {
+      date = new Date();
+      date.setDate(date.getDate() + 1);
+    } else {
+      date = new Date(rawDate);
+      if (isNaN(date.getTime())) date = new Date();
+    }
+    date.setHours(0, 0, 0, 0);
+    const mode = (args.mode as "ortools" | "heuristic" | undefined) ?? "ortools";
+
+    if (!(await isPythonOptimizerUp())) {
+      return {
+        ok: false,
+        error:
+          "El backend de optimización Python (FastAPI :8000) no está accesible. Arráncalo con `uvicorn app.main:app --port 8000` desde la raíz del repo, o usa suggest_routes que utiliza el motor TSP integrado del frontend.",
+      };
+    }
+
+    const result = await optimizeViaPython(date, mode);
+    if (!result) {
+      return {
+        ok: false,
+        error: `No se pudo optimizar para ${date.toISOString().slice(0, 10)}. Verifica que hay pedidos PENDING/DISPATCHED y furgonetas disponibles para esa fecha.`,
+      };
+    }
+
+    const { baseline, optimized, savings } = result;
+
+    return {
+      ok: true,
+      data: {
+        date: date.toISOString().slice(0, 10),
+        motor: optimized.tipo_planificacion,
+        plan: {
+          vehiculos_activos: optimized.vehiculos_activos,
+          distancia_km: Math.round(optimized.distancia_total_km * 10) / 10,
+          tiempo_horas: Math.round(optimized.tiempo_total_horas * 10) / 10,
+          coste_euros: Math.round(optimized.coste_total_euros * 100) / 100,
+          co2_kg: Math.round(optimized.co2_total_kg * 10) / 10,
+          pedidos_retrasados: optimized.pedidos_retrasados,
+          incidentes_sobrecarga: optimized.incidentes_sobrecarga,
+          rutas: optimized.rutas.map((r) => ({
+            vehiculo: r.id_vehiculo,
+            nombre: r.nombre_vehiculo,
+            paradas: r.detalle_paradas.length,
+            distancia_km: Math.round(r.distancia_km * 10) / 10,
+            coste_euros: Math.round(r.coste_euros * 100) / 100,
+            carga_kg: Math.round(r.carga_total_kg * 10) / 10,
+            primeras_paradas: r.detalle_paradas.slice(0, 3).map((s) => `${s.id_pedido} (${s.cliente}) a las ${s.hora_llegada}`),
+          })),
+        },
+        impacto_vs_plan_manual: {
+          ahorro_km: Math.round(savings.ahorro_distancia_km * 10) / 10,
+          ahorro_km_pct: Math.round(savings.ahorro_distancia_pct * 10) / 10,
+          ahorro_euros: Math.round(savings.ahorro_coste_euros * 100) / 100,
+          ahorro_euros_pct: Math.round(savings.ahorro_coste_pct * 10) / 10,
+          ahorro_co2_kg: Math.round(savings.ahorro_co2_kg * 10) / 10,
+          retrasos_evitados: savings.retrasos_evitados,
+          sobrecargas_evitadas: savings.sobrecargas_evitadas,
+        },
+        baseline_para_referencia: {
+          distancia_km: Math.round(baseline.distancia_total_km * 10) / 10,
+          coste_euros: Math.round(baseline.coste_total_euros * 100) / 100,
+          retrasados: baseline.pedidos_retrasados,
+        },
+      },
+    };
+  },
+
   list_routes: async (args) => {
     const where: Record<string, unknown> = {};
     if (args.date) {
@@ -527,7 +602,10 @@ export const TOOL_HANDLERS: Record<
     const pending = await prisma.routeStop.findMany({
       where: { routeId: route.id, status: { in: ["PENDING", "ARRIVED"] } },
     });
-    const pendingByOrder = new Map(pending.map((s) => [s.orderId, s]));
+    type PendingStop = (typeof pending)[number];
+    const pendingByOrder = new Map<string, PendingStop>(
+      pending.map((s: PendingStop) => [s.orderId, s] as const),
+    );
 
     // Move deferred orders to tomorrow + mark RESCHEDULED
     const tomorrow = new Date();

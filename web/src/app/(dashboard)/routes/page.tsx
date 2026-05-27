@@ -43,8 +43,8 @@ export default async function RoutesPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {routes.map((r) => {
-            const delivered = r.stops.filter((s) => s.status === "DELIVERED").length;
+          {routes.map((r: (typeof routes)[number]) => {
+            const delivered = r.stops.filter((s: { status: string }) => s.status === "DELIVERED").length;
             return (
               <Link key={r.id} href={`/routes/${r.id}`}>
                 <Card className="hover:border-[#1a531a] transition-colors h-full">

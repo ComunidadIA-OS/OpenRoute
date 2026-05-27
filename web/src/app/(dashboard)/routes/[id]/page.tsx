@@ -30,7 +30,7 @@ export default async function RouteDetailPage({ params }: { params: { id: string
     polyline: route.polyline,
     driver: route.driver ? { fullName: route.driver.fullName } : null,
     vehicle: route.vehicle ? { plate: route.vehicle.plate } : null,
-    stops: route.stops.map((s) => ({
+    stops: route.stops.map((s: (typeof route.stops)[number]) => ({
       id: s.id,
       sequence: s.sequence,
       status: s.status,
