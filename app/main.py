@@ -1,150 +1,287 @@
+"""
+OpenRoute — Panel Streamlit del gestor de flota.
+
+Esta aplicación carga el dataset de pedidos y la configuración de flota,
+ejecuta el motor de optimización dual (heurística propia + Google OR-Tools)
+con la baseline manual, y muestra:
+
+  - Tabla de pedidos cargados.
+  - Mapa interactivo con depósito y paradas.
+  - Cuadro comparativo de ahorros (km, €, CO2, retrasos, sobrecargas).
+  - Informe explicativo en lenguaje natural generado por el asistente IA
+    (Ollama local, con motor de plantillas como respaldo).
+
+Cómo arrancar:
+    streamlit run app/main.py
+
+Datos por defecto:
+    data/pedidos_ejemplo.csv          (30 pedidos en Elche+Alicante)
+    data/vehiculos_config.json        (3 furgonetas: eléctrica, diésel, apoyo)
+"""
+
+import os
+import sys
+
+# Permitir importar desde el paquete src/ sin instalarlo
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(HERE, os.pardir))
+SRC_PATH = os.path.join(REPO_ROOT, "src")
+if SRC_PATH not in sys.path:
+    sys.path.insert(0, SRC_PATH)
+
 import folium
 import pandas as pd
 import streamlit as st
 from streamlit_folium import st_folium
 
+from data_processor import DataProcessor
+from metrics import MetricsEngine
+from optimizer import RouteOptimizerFactory
+from ai_assistant import AIAssistant
+
+
+# ─── Configuración de página ─────────────────────────────────────────
 st.set_page_config(
-    page_title="OpenRoutePyME",
+    page_title="OpenRoute · Panel de Optimización",
     page_icon="🚚",
     layout="wide",
 )
 
-st.title("🚚 OpenRoutePyME")
-st.caption("Planificación logística abierta para pymes · Zona Elche / Alicante")
 
-st.divider()
-
-# ---------------------------------------------------------------------------
-# Datos de ejemplo para desarrollo (se eliminan cuando Samuel entregue el CSV)
-# ---------------------------------------------------------------------------
-DEMO_DATA = {
-    "id_pedido":     ["PED-001", "PED-002", "PED-003", "PED-004", "PED-005"],
-    "cliente":       ["Suministros Pérez", "Taller Mecánico Elche", "Distribuciones García", "Almacenes Martínez", "Ferretería La Industrial"],
-    "lat":           [38.2712, 38.2891, 38.3042, 38.2634, 38.2954],
-    "lon":           [-0.7023, -0.6812, -0.6543, -0.6987, -0.7134],
-    "prioridad":     ["Media", "Baja", "Alta", "Media", "Baja"],
-    "peso":          [45, 120, 33, 78, 55],
-    "franja_inicio": ["08:00", "09:00", "08:30", "10:00", "11:00"],
-    "franja_fin":    ["10:00", "11:00", "10:30", "13:00", "13:00"],
-}
-
-COLOR_PRIORIDAD = {
-    "Alta":  "red",
-    "Media": "orange",
-    "Baja":  "green",
-}
-
-DEPOT_LAT = 38.2669
-DEPOT_LON = -0.6985
+# ─── Rutas a los datasets ────────────────────────────────────────────
+ORDERS_PATH = os.path.join(REPO_ROOT, "data", "pedidos_ejemplo.csv")
+VEHICLES_PATH = os.path.join(REPO_ROOT, "data", "vehiculos_config.json")
 
 
-def cargar_demo() -> pd.DataFrame:
-    return pd.DataFrame(DEMO_DATA)
+# ─── Cache de cargas y cómputos pesados ──────────────────────────────
+@st.cache_data(show_spinner=False)
+def load_data():
+    processor = DataProcessor()
+    orders_df = processor.load_orders(ORDERS_PATH)
+    vehicles_df = processor.load_vehicles(VEHICLES_PATH)
+    depot_lat = vehicles_df.loc[0, "deposito_lat"]
+    depot_lon = vehicles_df.loc[0, "deposito_lon"]
+    dist_matrix, time_matrix = processor.build_distance_matrix(
+        depot_lat, depot_lon, orders_df
+    )
+    return orders_df, vehicles_df, dist_matrix, time_matrix, depot_lat, depot_lon
 
 
-# ---------------------------------------------------------------------------
-# Carga del archivo o modo demo
-# ---------------------------------------------------------------------------
-archivo = st.file_uploader(
-    "Sube tu archivo de pedidos (CSV separado por punto y coma)",
-    type=["csv"],
+@st.cache_data(show_spinner=False)
+def run_optimization(_mode: str, _ds_hash: str):
+    """
+    Ejecuta baseline manual + optimizador seleccionado + comparativa.
+    _ds_hash invalida el caché si cambian los datos cargados.
+    """
+    orders_df, vehicles_df, dist_matrix, time_matrix, _, _ = load_data()
+    metrics = MetricsEngine()
+    baseline = metrics.simulate_manual_baseline(
+        orders_df, vehicles_df, dist_matrix, time_matrix
+    )
+    optimizer = RouteOptimizerFactory.get_optimizer(_mode)
+    optimized = optimizer.optimize(
+        orders_df, vehicles_df, dist_matrix, time_matrix
+    )
+    savings = metrics.compare_plans(baseline, optimized)
+    return baseline, optimized, savings
+
+
+def colored_metric(label: str, value: str, delta: str | None = None, help_text: str | None = None):
+    st.metric(label, value, delta=delta, help=help_text)
+
+
+# ─── Cabecera ────────────────────────────────────────────────────────
+st.title("🚚 OpenRoute — Panel del Gestor de Flota")
+st.caption(
+    "Optimización VRP con OR-Tools · Comparativa con plan manual · "
+    "Explicación en lenguaje natural con LLM local (Ollama)."
 )
 
-if archivo is not None:
-    try:
-        df = pd.read_csv(archivo, sep=";", encoding="utf-8")
-    except Exception as e:
-        st.error(f"No se pudo leer el archivo: {e}")
-        st.stop()
-
-    columnas_requeridas = {"id_pedido", "cliente", "lat", "lon", "prioridad", "peso", "franja_inicio", "franja_fin"}
-    if not columnas_requeridas.issubset(df.columns):
-        st.error(f"Faltan columnas en el CSV: {columnas_requeridas - set(df.columns)}")
-        st.stop()
-
-    st.success(f"**{len(df)} pedidos cargados** desde `{archivo.name}`")
-
-else:
-    st.warning("No hay archivo cargado.")
-    if st.button("Usar datos de ejemplo (modo desarrollo)"):
-        st.session_state["usar_demo"] = True
-
-    if not st.session_state.get("usar_demo"):
-        st.stop()
-
-    df = cargar_demo()
-    st.info(f"Mostrando **{len(df)} pedidos de ejemplo**. Sustituye por el CSV real cuando esté disponible.")
-
-# ---------------------------------------------------------------------------
-# Tabla de datos
-# ---------------------------------------------------------------------------
-with st.expander("Ver datos cargados", expanded=False):
-    st.dataframe(df, use_container_width=True, height=300)
-
-st.divider()
-
-# ---------------------------------------------------------------------------
-# Mapa Folium
-# ---------------------------------------------------------------------------
-def construir_mapa(df: pd.DataFrame) -> folium.Map:
-    mapa = folium.Map(
-        location=[df["lat"].mean(), df["lon"].mean()],
-        zoom_start=13,
-        tiles="CartoDB positron",
-    )
-
-    # Depósito de salida
-    folium.Marker(
-        location=[DEPOT_LAT, DEPOT_LON],
-        icon=folium.Icon(color="black", icon="home", prefix="fa"),
-        popup=folium.Popup("<b>Depósito central</b>", max_width=200),
-        tooltip="Depósito central",
-    ).add_to(mapa)
-
-    # Un marcador por pedido
-    for _, row in df.iterrows():
-        color = COLOR_PRIORIDAD.get(row["prioridad"], "blue")
-        popup_html = f"""
-            <b>{row['id_pedido']}</b><br>
-            {row['cliente']}<br>
-            <hr style='margin:4px 0'>
-            Prioridad: <b>{row['prioridad']}</b><br>
-            Peso: {row['peso']} kg<br>
-            Franja: {row['franja_inicio']} – {row['franja_fin']}
+with st.expander("ℹ️ ¿Qué hace esta pantalla?", expanded=False):
+    st.markdown(
         """
-        folium.CircleMarker(
-            location=[row["lat"], row["lon"]],
-            radius=9,
-            color=color,
-            fill=True,
-            fill_color=color,
-            fill_opacity=0.8,
-            tooltip=f"{row['id_pedido']} · {row['cliente']}",
-            popup=folium.Popup(popup_html, max_width=220),
-        ).add_to(mapa)
+        Esta aplicación demuestra el **motor de optimización** del backend
+        de OpenRoute. Carga los pedidos y la flota, ejecuta el solver
+        elegido (heurística propia o Google OR-Tools), lo compara contra
+        un plan manual heurístico (vecino más cercano + urgencia + carga
+        pesada) y produce un informe operativo para el gestor.
 
-    # PLACEHOLDER ruta — se reemplazará cuando Samuel entregue el optimizador
-    # folium.PolyLine(coordenadas_ruta, color="blue", weight=3).add_to(mapa)
-
-    return mapa
-
-
-# ---------------------------------------------------------------------------
-# Layout principal
-# ---------------------------------------------------------------------------
-col_mapa, col_panel = st.columns([3, 2])
-
-with col_mapa:
-    st.subheader("Mapa de pedidos")
-    st.caption("🔴 Alta · 🟠 Media · 🟢 Baja · 🏠 Depósito  — haz clic en un pin para ver el detalle")
-    st_folium(construir_mapa(df), width=700, height=500, returned_objects=[])
-
-with col_panel:
-    st.subheader("Explicación de la IA")
-    st.caption("Aquí aparecerá el análisis generado por el modelo de lenguaje.")
-    # PLACEHOLDER — se reemplazará en el Paso 3 con el output de Juan David
-    st.info(
-        "Una vez optimizadas las rutas, la IA explicará aquí el ahorro "
-        "conseguido respecto a la planificación manual, apoyándose en "
-        "datos numéricos concretos."
+        Es **complementaria** al frontend conversacional (`web/`), donde
+        un chatbot LLM permite operar el sistema en lenguaje natural.
+        """
     )
+
+
+# ─── Carga inicial de datos ──────────────────────────────────────────
+try:
+    orders_df, vehicles_df, dist_matrix, time_matrix, depot_lat, depot_lon = load_data()
+except FileNotFoundError as e:
+    st.error(f"No se pueden cargar los datos: {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"Error cargando datos: {e}")
+    st.stop()
+
+
+# ─── Controles laterales ─────────────────────────────────────────────
+with st.sidebar:
+    st.header("⚙️ Configuración")
+    mode_label = st.radio(
+        "Motor de optimización",
+        ["Google OR-Tools (industrial)", "Heurística propia (académica)"],
+        index=0,
+        help=(
+            "OR-Tools: solver CVRPTW con time windows y capacidades. "
+            "Heurística: K-Means + Vecino Más Cercano Ponderado por prioridad."
+        ),
+    )
+    mode = "ortools" if mode_label.startswith("Google") else "heuristic"
+
+    st.markdown("---")
+    st.markdown("**Dataset cargado**")
+    st.markdown(f"- Pedidos: **{len(orders_df)}**")
+    st.markdown(f"- Vehículos: **{len(vehicles_df)}**")
+    st.markdown(f"- Depósito: `{depot_lat:.4f}, {depot_lon:.4f}`")
+
+    st.markdown("---")
+    st.markdown(
+        "Datos en `data/pedidos_ejemplo.csv` y `data/vehiculos_config.json`. "
+        "Para usar tu propio dataset, sustituye esos archivos."
+    )
+
+
+# ─── Ejecutar optimización ───────────────────────────────────────────
+with st.spinner(f"Ejecutando baseline manual + {mode_label}..."):
+    baseline, optimized, savings = run_optimization(mode, _ds_hash=str(len(orders_df)))
+
+
+# ─── Cuadro de impacto ──────────────────────────────────────────────
+st.subheader("📊 Impacto del optimizador frente al plan manual")
+c1, c2, c3, c4 = st.columns(4)
+with c1:
+    colored_metric(
+        "Distancia",
+        f"{optimized['distancia_total_km']:.1f} km",
+        f"−{savings['ahorro_distancia_km']:.1f} km ({savings['ahorro_distancia_pct']:.1f}%)",
+        help_text=f"Plan manual: {baseline['distancia_total_km']:.1f} km",
+    )
+with c2:
+    colored_metric(
+        "Coste",
+        f"{optimized['coste_total_euros']:.2f} €",
+        f"−{savings['ahorro_coste_euros']:.2f} € ({savings['ahorro_coste_pct']:.1f}%)",
+        help_text=f"Plan manual: {baseline['coste_total_euros']:.2f} €",
+    )
+with c3:
+    colored_metric(
+        "CO₂",
+        f"{optimized['co2_total_kg']:.1f} kg",
+        f"−{savings['ahorro_co2_kg']:.1f} kg ({savings['ahorro_co2_pct']:.1f}%)",
+        help_text=f"Plan manual: {baseline['co2_total_kg']:.1f} kg",
+    )
+with c4:
+    colored_metric(
+        "Retrasos",
+        f"{optimized['pedidos_retrasados']} / {len(orders_df)}",
+        f"−{savings['retrasos_evitados']} a tiempo",
+        help_text=f"Plan manual: {baseline['pedidos_retrasados']} retrasados",
+    )
+
+with st.expander("Detalle por vehículo", expanded=False):
+    rows = []
+    for r in optimized["rutas"]:
+        rows.append(
+            {
+                "Vehículo": f"{r['nombre_vehiculo']} ({r['id_vehiculo']})",
+                "Paradas": len(r["detalle_paradas"]),
+                "Distancia (km)": round(r["distancia_km"], 1),
+                "Coste (€)": round(r["coste_euros"], 2),
+                "CO₂ (kg)": round(r["co2_emissions_kg"], 1),
+                "Carga (kg)": round(r["carga_total_kg"], 1),
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+# ─── Layout principal: tabla + mapa ──────────────────────────────────
+st.subheader("🗺️ Plan de ruta optimizado")
+left, right = st.columns([3, 2])
+
+with left:
+    # Mapa Folium con depósito + paradas coloreadas por vehículo
+    fmap = folium.Map(location=[depot_lat, depot_lon], zoom_start=11, tiles="OpenStreetMap")
+
+    folium.Marker(
+        [depot_lat, depot_lon],
+        popup="Depósito central",
+        icon=folium.Icon(color="black", icon="industry", prefix="fa"),
+    ).add_to(fmap)
+
+    palette = ["#1a531a", "#0d4f8a", "#a83232", "#7a3f9c", "#c46b00", "#005f73"]
+    for idx, r in enumerate(optimized["rutas"]):
+        color = palette[idx % len(palette)]
+        points = [(depot_lat, depot_lon)]
+        for s in r["detalle_paradas"]:
+            stop_row = orders_df[orders_df["id_pedido"] == s["id_pedido"]].iloc[0]
+            lat, lon = stop_row["lat"], stop_row["lon"]
+            points.append((lat, lon))
+            popup_html = (
+                f"<b>{s['id_pedido']}</b> &mdash; {s['cliente']}<br>"
+                f"Vehículo: {r['id_vehiculo']}<br>"
+                f"Hora llegada: {s['hora_llegada']}<br>"
+                f"Ventana: {s['ventana']}<br>"
+                f"Peso: {s['peso_kg']} kg · Prioridad: {s['prioridad']}"
+            )
+            folium.CircleMarker(
+                [lat, lon],
+                radius=8,
+                color=color,
+                fill=True,
+                fill_opacity=0.85,
+                popup=folium.Popup(popup_html, max_width=300),
+                tooltip=f"{s['id_pedido']} · {s['hora_llegada']}",
+            ).add_to(fmap)
+        points.append((depot_lat, depot_lon))
+        folium.PolyLine(points, color=color, weight=3, opacity=0.7).add_to(fmap)
+
+    st_folium(fmap, width=None, height=520, returned_objects=[])
+
+with right:
+    st.markdown("**Pedidos cargados**")
+    display_df = orders_df[
+        ["id_pedido", "cliente", "prioridad", "peso_kg", "franja_inicio", "franja_fin"]
+    ].rename(
+        columns={
+            "id_pedido": "Código",
+            "cliente": "Cliente",
+            "prioridad": "Prio.",
+            "peso_kg": "Peso (kg)",
+            "franja_inicio": "Desde",
+            "franja_fin": "Hasta",
+        }
+    )
+    st.dataframe(display_df, use_container_width=True, hide_index=True, height=520)
+
+
+# ─── Informe en lenguaje natural ─────────────────────────────────────
+st.subheader("🤖 Informe ejecutivo del asistente IA")
+
+if st.button("Generar informe", type="primary"):
+    with st.spinner("Generando informe con Ollama local (o motor de plantillas si Ollama no responde)..."):
+        try:
+            ai = AIAssistant()
+            report = ai.generate_explanation(optimized, savings)
+            st.markdown(report)
+        except Exception as e:
+            st.error(f"Error generando informe: {e}")
+else:
+    st.info(
+        "Pulsa **Generar informe** para obtener un análisis en lenguaje natural "
+        "con el LLM local. Si Ollama no responde, cae al motor de plantillas heurísticas."
+    )
+
+st.markdown("---")
+st.caption(
+    "OpenRoute · backend Python + frontend `web/` (Next.js) · "
+    "Hackathon IA Responsable y Abierta · Mayo 2026"
+)
