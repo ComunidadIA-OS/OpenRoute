@@ -99,6 +99,9 @@ type PythonComparison = {
   ahorro_coste_euros: number;
   ahorro_coste_pct: number;
   ahorro_co2_kg: number;
+  // El backend (metrics.compare_plans) ya calcula el % de ahorro de CO₂.
+  // Se expone aquí para que el chatbot pueda decir "ahorramos un 18%".
+  ahorro_co2_pct: number;
   retrasos_evitados: number;
   sobrecargas_evitadas: number;
 };

@@ -456,12 +456,18 @@ export const TOOL_HANDLERS: Record<
           ahorro_euros: Math.round(savings.ahorro_coste_euros * 100) / 100,
           ahorro_euros_pct: Math.round(savings.ahorro_coste_pct * 10) / 10,
           ahorro_co2_kg: Math.round(savings.ahorro_co2_kg * 10) / 10,
+          // El backend ya calcula el % de ahorro de CO2; lo exponemos al LLM
+          // para que pueda dar la cifra relativa además de la absoluta.
+          ahorro_co2_pct: Math.round(savings.ahorro_co2_pct * 10) / 10,
           retrasos_evitados: savings.retrasos_evitados,
           sobrecargas_evitadas: savings.sobrecargas_evitadas,
         },
         baseline_para_referencia: {
           distancia_km: Math.round(baseline.distancia_total_km * 10) / 10,
           coste_euros: Math.round(baseline.coste_total_euros * 100) / 100,
+          // CO2 del baseline para que el LLM pueda contextualizar el ahorro
+          // ("pasamos de 12.4 a 8.1 kg CO2") en lugar de mostrar solo el delta.
+          co2_kg: Math.round(baseline.co2_total_kg * 10) / 10,
           retrasados: baseline.pedidos_retrasados,
         },
       },
