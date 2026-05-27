@@ -24,11 +24,12 @@ from __future__ import annotations
 
 import os
 import sys
+from io import BytesIO
 from typing import Literal
 
 import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -237,4 +238,172 @@ def compare(req: OptimizeRequest):
         "savings": savings,
         "used_fallback": bool(optimized_plan.get("used_fallback", False)),
         "fallback_reason": optimized_plan.get("fallback_reason"),
+    })
+
+
+# ─── Endpoint CSV (sin DB) ────────────────────────────────────────────
+#
+# Caso de uso TRL5: una pyme con su propio CSV de pedidos quiere ver, antes
+# de tocar ningún sistema, qué rutas saldrían con OR-Tools y cuánto se
+# ahorraría vs un reparto manual. Esto NO toca la base de datos del frontend.
+#
+# Acepta uno o varios CSV en la misma llamada:
+#   - 1 CSV  → devuelve solo el plan individual.
+#   - 2+ CSV → devuelve cada plan individual + un plan combinado (todos los
+#              pedidos como una sola jornada). Permite medir el ahorro de
+#              consolidar varios turnos/clientes/días.
+#
+# Los IDs de pedido se prefijan en el combinado para evitar colisiones entre
+# CSVs distintos que reusen "PED-001" etc.
+
+def _process_single_csv(
+    raw_df: pd.DataFrame,
+    vehicles_df: pd.DataFrame,
+    depot_lat: float,
+    depot_lon: float,
+    mode: str,
+) -> dict:
+    """Valida un DataFrame de pedidos, lo optimiza y devuelve el bloque de resultados.
+
+    Se separa del endpoint para poder reusarse tanto en el procesado individual
+    como en el combinado (concat de varios CSVs).
+    """
+    processor = DataProcessor()
+    rows_raw = len(raw_df)
+    try:
+        orders_df = processor.validate_orders(raw_df)
+    except ValueError as e:
+        # Falta una columna obligatoria u otra validación dura del schema.
+        raise HTTPException(status_code=400, detail=f"CSV inválido: {e}")
+
+    rows_loaded = len(orders_df)
+    if rows_loaded == 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Ninguna fila pasó la validación. Causas frecuentes: lat/lon fuera "
+                "del rango Alicante/Elche (37.5–39.5, -1.5–0.5) o columnas obligatorias "
+                "nulas. Revisa data_processor.py:43 si tu zona es otra."
+            ),
+        )
+
+    dist_matrix, time_matrix = processor.build_distance_matrix(depot_lat, depot_lon, orders_df)
+
+    metrics = MetricsEngine()
+    baseline_plan = metrics.simulate_manual_baseline(orders_df, vehicles_df, dist_matrix, time_matrix)
+    optimizer = RouteOptimizerFactory.get_optimizer(mode)
+    optimized_plan = optimizer.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
+    savings = metrics.compare_plans(baseline_plan, optimized_plan)
+
+    return {
+        "rows_raw": rows_raw,
+        "rows_loaded": rows_loaded,
+        "rows_discarded": rows_raw - rows_loaded,
+        "baseline": baseline_plan,
+        "optimized": optimized_plan,
+        "savings": savings,
+        "used_fallback": bool(optimized_plan.get("used_fallback", False)),
+        "fallback_reason": optimized_plan.get("fallback_reason"),
+        "pedidos_diferidos": optimized_plan.get("pedidos_diferidos", []),
+    }
+
+
+@app.post("/optimize-csv")
+async def optimize_csv(
+    files: list[UploadFile] = File(..., description="Uno o varios CSV de pedidos."),
+    mode: Literal["ortools", "heuristic"] = Form("ortools"),
+):
+    """Optimiza uno o varios CSV de pedidos SIN tocar la base de datos del frontend.
+
+    Cada CSV se procesa por separado y se devuelve su plan + comparación contra
+    el baseline manual. Si se suben 2 o más CSVs, también se calcula un plan
+    "combinado" tratando todos los pedidos como una sola jornada — útil para
+    medir el ahorro de consolidación entre turnos/días/clientes.
+
+    Form fields:
+      files: uno o varios CSV con las 8 columnas estándar.
+      mode:  "ortools" (default, industrial) o "heuristic".
+    """
+    if not files:
+        raise HTTPException(status_code=400, detail="Hay que subir al menos un CSV")
+
+    processor = DataProcessor()
+    try:
+        vehicles_df = processor.load_vehicles(_default_vehicles_path())
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo cargar la flota por defecto ({_default_vehicles_path()}): {e}",
+        )
+    depot_lat = float(vehicles_df.loc[0, "deposito_lat"])
+    depot_lon = float(vehicles_df.loc[0, "deposito_lon"])
+
+    individual: list[dict] = []
+    valid_dfs: list[pd.DataFrame] = []
+    valid_filenames: list[str] = []
+
+    for upload in files:
+        filename = upload.filename or "sin-nombre.csv"
+        content = await upload.read()
+        if not content:
+            individual.append({"filename": filename, "error": "Archivo vacío"})
+            continue
+        try:
+            raw_df = pd.read_csv(BytesIO(content))
+        except Exception as e:
+            individual.append({"filename": filename, "error": f"No se pudo parsear como CSV: {e}"})
+            continue
+
+        try:
+            result = _process_single_csv(raw_df, vehicles_df, depot_lat, depot_lon, mode)
+        except HTTPException as e:
+            individual.append({"filename": filename, "error": e.detail})
+            continue
+        except Exception as e:
+            individual.append({"filename": filename, "error": f"Error optimizando: {e}"})
+            continue
+
+        result["filename"] = filename
+        individual.append(result)
+
+        # Reservamos el dataframe validado para el análisis combinado.
+        # Re-validamos para tener las columnas calculadas (minutos_inicio/fin) listas.
+        valid_dfs.append(processor.validate_orders(raw_df))
+        valid_filenames.append(filename)
+
+    # Análisis combinado solo tiene sentido con 2+ CSVs válidos. Si solo hay
+    # uno, devolvemos individual y combined=null.
+    combined: dict | None = None
+    if len(valid_dfs) >= 2:
+        # Prefijamos id_pedido con el índice del fichero para evitar colisiones
+        # cuando dos CSVs distintos reusan "PED-001".
+        prefixed = []
+        for idx, df in enumerate(valid_dfs):
+            df2 = df.copy()
+            df2["id_pedido"] = df2["id_pedido"].astype(str).map(lambda x, i=idx: f"F{i+1}_{x}")
+            prefixed.append(df2)
+        merged = pd.concat(prefixed, ignore_index=True)
+
+        dist_matrix, time_matrix = processor.build_distance_matrix(depot_lat, depot_lon, merged)
+        metrics = MetricsEngine()
+        baseline_plan = metrics.simulate_manual_baseline(merged, vehicles_df, dist_matrix, time_matrix)
+        optimizer = RouteOptimizerFactory.get_optimizer(mode)
+        optimized_plan = optimizer.optimize(merged, vehicles_df, dist_matrix, time_matrix)
+        savings = metrics.compare_plans(baseline_plan, optimized_plan)
+
+        combined = {
+            "files": valid_filenames,
+            "total_rows": len(merged),
+            "baseline": baseline_plan,
+            "optimized": optimized_plan,
+            "savings": savings,
+            "used_fallback": bool(optimized_plan.get("used_fallback", False)),
+            "fallback_reason": optimized_plan.get("fallback_reason"),
+            "pedidos_diferidos": optimized_plan.get("pedidos_diferidos", []),
+        }
+
+    return _serialize_plan({
+        "mode": mode,
+        "individual": individual,
+        "combined": combined,
     })

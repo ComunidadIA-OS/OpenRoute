@@ -12,6 +12,9 @@ ortools>=9.10.4067
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.6
+# python-multipart: requerido por FastAPI para parsear multipart/form-data
+# (necesario cuando un endpoint acepta UploadFile, como /optimize-csv).
+python-multipart>=0.0.9
 
 # Llamada a Ollama (LLM local, open source)
 requests>=2.31.0
