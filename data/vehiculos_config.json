@@ -2,7 +2,7 @@
   {
     "id_vehiculo": "VAN-01",
     "nombre": "Furgoneta Eléctrica (Elche/Alicante)",
-    "capacidad_kg": 400,
+    "capacidad_kg": 700,
     "coste_por_km": 0.15,
     "hora_inicio": "08:00",
     "hora_fin": "16:00",
@@ -13,7 +13,7 @@
   {
     "id_vehiculo": "VAN-02",
     "nombre": "Furgoneta Diésel (Alicante Este)",
-    "capacidad_kg": 500,
+    "capacidad_kg": 900,
     "coste_por_km": 0.35,
     "hora_inicio": "08:30",
     "hora_fin": "17:30",
@@ -24,7 +24,7 @@
   {
     "id_vehiculo": "VAN-03",
     "nombre": "Furgoneta de Apoyo (Cercanías Elche)",
-    "capacidad_kg": 250,
+    "capacidad_kg": 600,
     "coste_por_km": 0.22,
     "hora_inicio": "09:00",
     "hora_fin": "15:00",
