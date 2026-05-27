@@ -124,6 +124,25 @@ export const TOOLS: ToolDef[] = [
   {
     type: "function",
     function: {
+      name: "optimize_with_ortools",
+      description:
+        "Resuelve el VRP del día con Google OR-Tools del backend Python (CVRPTW con time windows y capacidades). Devuelve el plan optimizado por vehículo + comparativa contra plan manual: ahorro en km, €, CO2 y retrasos evitados. Úsalo cuando el usuario pida 'optimiza con OR-Tools', 'planifica el día con el motor industrial' o quiera ver el impacto medido frente a un reparto manual. Requiere que el backend Python esté arriba.",
+      parameters: {
+        type: "object",
+        properties: {
+          date: { type: "string", description: "YYYY-MM-DD. Si no se da, hoy." },
+          mode: {
+            type: "string",
+            enum: ["ortools", "heuristic"],
+            description: "Motor: ortools (industrial) o heuristic (académico). Default ortools.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "list_routes",
       description: "Lista rutas filtrando por fecha y/o conductor.",
       parameters: {

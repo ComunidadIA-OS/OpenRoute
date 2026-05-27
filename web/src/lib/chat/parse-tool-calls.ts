@@ -12,6 +12,7 @@ const KNOWN_TOOLS = new Set([
   "list_vehicles",
   "list_drivers",
   "suggest_routes",
+  "optimize_with_ortools",
   "assign_route",
   "list_routes",
   "get_route",
