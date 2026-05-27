@@ -6,6 +6,12 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 
 ## [Unreleased]
 
+### Añadido
+
+- **Despliegue con Docker**: `Dockerfile` para el microservicio FastAPI, `web/Dockerfile` multi-stage para Next.js con `output: standalone`, `docker-compose.yml` que orquesta los 4 servicios (optimizer + ollama + ollama-pull + web) con healthchecks y dependencias. `docker compose up --build` arranca todo desde cero.
+- **`docker-entrypoint.sh`** del frontend: aplica migraciones Prisma y siembra usuarios demo en el primer arranque; preserva la DB en siguientes reinicios.
+- **`.dockerignore`** en raíz y `web/` para mantener el build context pequeño.
+
 Trabajo en curso fuera del hito del hackathon. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## [0.2.0] — 2026-05-27 · Entrega del Hackathon IA Responsable y Abierta en Industria
