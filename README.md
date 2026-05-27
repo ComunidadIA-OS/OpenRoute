@@ -71,6 +71,7 @@ Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el detalle técnico.
 * [Google OR-Tools](https://developers.google.com/optimization) (CVRPTW industrial) en `src/optimizer.py`.
 * Heurística académica propia (K-Means + Vecino Más Cercano Ponderado) como alternativa.
 * Matriz de distancias **OSRM `/table`** por defecto (callejero real); fallback automático a Haversine × factor urbano si OSRM no responde (`src/osrm_client.py`). Desactivable con `OPENROUTE_DISABLE_OSRM=1` para entornos sin red.
+* **Bounding box configurable** (`OPENROUTE_BBOX="lat_min,lat_max,lon_min,lon_max"` o `worldwide`): por defecto Alicante/Elche, pero cualquier pyme puede operar en su propia zona sin tocar código. La pantalla `/import` también lo expone como selector.
 * Cliente Ollama propio en `src/ai_assistant.py` para generar informes en lenguaje natural.
 
 Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).

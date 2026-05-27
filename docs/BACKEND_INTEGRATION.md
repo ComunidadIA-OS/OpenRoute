@@ -28,6 +28,13 @@ otro componente Python.
   hash de coordenadas. Mismo patrón que el cliente TS de
   `web/src/lib/osrm.ts`. Se desactiva globalmente con la env var
   `OPENROUTE_DISABLE_OSRM=1` (útil en CI sin red).
+
+**Bounding box configurable**: `DataProcessor(bbox=...)` o env var
+`OPENROUTE_BBOX="lat_min,lat_max,lon_min,lon_max"` (también acepta
+`"worldwide"` para no restringir). Sin configurar, mantiene el default
+histórico de Alicante/Elche. Pedidos fuera del bbox se descartan en
+`validate_orders` y la cuenta queda visible para el caller — útil
+para diagnosticar CSVs con coordenadas en zona incorrecta.
 - `src/optimizer.py` — Resolvedores duales con patrón Strategy:
   - **Heurística Propia**: clustering geográfico + Vecino Más Cercano
     Ponderado por prioridad.
