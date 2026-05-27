@@ -5,7 +5,7 @@
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org)
-[![Ollama llama3.1](https://img.shields.io/badge/Ollama-llama3.1:8b-1a531a?logo=ollama)](https://ollama.com)
+[![Ollama llama3.2](https://img.shields.io/badge/Ollama-llama3.2:1b-1a531a?logo=ollama)](https://ollama.com)
 [![Hackathon](https://img.shields.io/badge/Hackathon-IA_Responsable_y_Abierta-000000?logo=github)](https://github.com/ComunidadIA-OS)
 
 ---
@@ -27,7 +27,7 @@ OpenRoute presenta un **único producto al usuario**: el frontend conversacional
 | **Frontend conversacional (`web/`)** | Next.js 14 + chatbot Ollama + mapa Leaflet + Prisma/SQLite. UI única que ven los usuarios. | `cd web && npm run dev` (puerto 3000) | Siempre. Es la cara del producto. |
 | **Microservicio FastAPI (`app/`)** | Wrapper HTTP sobre el motor VRP de Python (`src/`). Expone `/optimize`, `/baseline`, `/compare`. | `uvicorn app.main:app --port 8000` | Cuando el chatbot llama al tool `optimize_with_ortools`. |
 | **Motor Python (`src/`)** | Solver VRP dual: heurística propia (K-Means + VMC) + Google OR-Tools (CVRPTW). Procesador de datos, simulador baseline manual y asistente IA con Ollama. | Llamado por el FastAPI internamente | Cuando se pide optimización industrial con time windows y capacidades. |
-| **Ollama local** | LLM `llama3.1:8b` con tool calling. Mismo modelo para el chatbot y para los informes explicativos del motor Python. | `ollama serve` (puerto 11434) | Continuamente mientras el chatbot está en uso. |
+| **Ollama local** | LLM `llama3.2:1b` con tool calling (configurable vía `OLLAMA_MODEL`). Mismo modelo para el chatbot del frontend y para los informes explicativos del motor Python. | `ollama serve` (puerto 11434) | Continuamente mientras el chatbot está en uso. |
 
 **Flujo típico:**
 
@@ -62,7 +62,7 @@ Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el detalle técnico.
 * [Prisma](https://www.prisma.io/) + SQLite (cambio a Postgres con una variable de entorno).
 * [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) + [OSRM](https://project-osrm.org/) público para mapa y TSP rápido.
 * [Nominatim](https://nominatim.openstreetmap.org/) de OSM para geocoding con caché persistente.
-* [Ollama](https://ollama.com/) con `llama3.1:8b` y tool calling nativo.
+* [Ollama](https://ollama.com/) con `llama3.2:1b` por defecto (configurable, soporta `llama3.2:3b` y `llama3.1:8b` para entornos con más recursos). Tool calling nativo.
 * JWT en cookie `httpOnly` para auth.
 
 ### Backend de optimización (`app/` + `src/`)
@@ -87,9 +87,11 @@ OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservi
 
 > **Atajo (Windows, opción B)**: una vez instaladas las dependencias (pasos 2A, 2B, 2C), `.\start.ps1` desde la raíz verifica los prerrequisitos y arranca FastAPI + Next.js automáticamente. Ollama se asume corriendo como servicio. Ahorra abrir 3 terminales.
 
-### Opción A — Docker (un solo comando)
+### Opción A — Docker (recomendada para evaluación)
 
 Requisitos: **Docker** y **Docker Compose** instalados (incluidos en Docker Desktop).
+
+> **Antes de arrancar**: en Docker Desktop → Settings → Resources, asigna **mínimo 6 GB de RAM y 4 CPUs**. Con menos, el chatbot puede colgarse al cargar el modelo en memoria.
 
 ```bash
 git clone https://github.com/ComunidadIA-OS/OpenRoute.git
@@ -97,12 +99,32 @@ cd OpenRoute
 docker compose up --build
 ```
 
-En la primera ejecución, el servicio `ollama-pull` descarga `llama3.1:8b` (~5 GB). El frontend está accesible mientras tanto, pero el chat devolverá error hasta que el modelo termine de bajarse.
+**El primer arranque tarda 10-20 minutos**:
+1. Pull de imágenes base (`python:3.12-slim`, `node:20-alpine`, `ollama/ollama`): ~3 min.
+2. Build de las imágenes del motor y el frontend: ~4 min (el seed de la DB ocurre durante el build).
+3. El servicio `ollama-pull` descarga `llama3.2:1b` (~1.3 GB) y `llama3.2:3b` (~2 GB) como reserva: ~5-10 min según la red.
 
-Tras el arranque:
+Mientras se descarga el modelo el frontend está accesible, pero el chat dará error hasta que termine.
+
+Para seguir el progreso del download:
+
+```bash
+docker compose logs -f ollama-pull
+```
+
+Cuando aparezca `[ollama-pull] Modelos listos. Saliendo.`, ya está. Verifica con:
+
+```bash
+docker compose ps                                  # los 3 servicios en (healthy)
+docker exec openroute-ollama ollama list           # debe listar llama3.2:1b
+```
+
+Tras eso:
 - Frontend: <http://localhost:3000> (login `admin / admin123`).
 - API del motor: <http://localhost:8000/docs>.
 - Ollama: <http://localhost:11434>.
+
+> **Sobre el chatbot**: corre 100% local sin GPU. La primera respuesta tarda 10-30 s (carga del modelo en RAM); las siguientes son de 5-15 s. Es deliberado — todo el procesamiento de los datos del cliente ocurre dentro de tu máquina, no se envía nada a la nube. Si quieres velocidad de pruebas, cambia `OLLAMA_MODEL` a `llama3.2:3b` en [`docker-compose.yml`](docker-compose.yml) (más capaz, también más lento).
 
 Comandos útiles:
 
@@ -126,8 +148,8 @@ cd OpenRoute
 ### 2A. Ollama (LLM local) — Terminal 1
 
 ```bash
-# Descargar el modelo (una sola vez, ~5GB)
-ollama pull llama3.1:8b
+# Descargar el modelo (una sola vez, ~1.3 GB)
+ollama pull llama3.2:1b
 
 # En Windows ya arranca como servicio. En macOS/Linux:
 ollama serve
