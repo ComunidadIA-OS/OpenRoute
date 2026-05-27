@@ -1,152 +1,184 @@
+"""Baseline manual y métricas comparativas.
+
+`simulate_manual_baseline` modela cómo planifica una pyme **sin software de
+optimización**: con Excel y sentido común. La heurística humana realista es:
+
+1. **Agrupar por zona geográfica** (cada vehículo cubre un barrio).
+2. **Dentro de cada zona, ordenar por urgencia de ventana horaria** (los pedidos
+   cuya `franja_fin` vence antes se entregan primero).
+3. Servir secuencialmente en ese orden, sin reoptimizar dinámicamente.
+
+Esto es lo que de verdad hace un despachador con experiencia. NO es:
+- "idx % num_vehicles" (round-robin por orden de aparición en el Excel), que era
+  el baseline anterior y resultaba artificialmente malo. Ningún humano planifica
+  ignorando la geografía.
+- "vecino más cercano con score ponderado", que es lo que hace la heurística
+  algorítmica de `optimizer.HeuristicRouteOptimizer` — eso ya es optimización.
+
+Esta versión refleja honestamente la dificultad de batirla. Si el optimizador
+ahorra X% vs ESTE baseline, ese X% es el valor real que el software aporta a la
+pyme. Si el ahorro vs el baseline anterior era espectacular, era porque el
+baseline era una caricatura.
+"""
+
 import numpy as np
 import pandas as pd
 
+from optimizer import CO2_DIESEL_VAN_G_PER_KM, CO2_ELECTRIC_VAN_G_PER_KM
+
+
 class MetricsEngine:
-    """
-    Clase para calcular métricas operativas, ecológicas y financieras.
-    Permite generar un baseline manual para comparar el impacto del algoritmo optimizado.
-    """
-    def __init__(self, co2_g_per_km_diesel=220.0, co2_g_per_km_electric=0.0):
-        self.co2_g_per_km_diesel = co2_g_per_km_diesel # Emisiones furgoneta tradicional (g/km)
+    """Simulador del plan manual (baseline humano) y comparador con el plan optimizado."""
+
+    def __init__(self, co2_g_per_km_diesel=CO2_DIESEL_VAN_G_PER_KM,
+                 co2_g_per_km_electric=CO2_ELECTRIC_VAN_G_PER_KM):
+        self.co2_g_per_km_diesel = co2_g_per_km_diesel
         self.co2_g_per_km_electric = co2_g_per_km_electric
-        self.service_time_min = 10.0 # Tiempo fijo por parada en minutos
+        self.service_time_min = 10.0
+
+    def _assign_by_zone(self, orders_df, vehicles_df):
+        """Asigna pedidos a vehículos por proximidad geográfica al depósito del vehículo.
+
+        Modela cómo el despachador con Excel mira el mapa y dice "esta zona la
+        cubre Juan, esta otra María". Si todos los vehículos comparten depósito,
+        agrupa por k-means simple en coordenadas; cada vehículo recoge su cluster.
+        """
+        n = len(orders_df)
+        v = len(vehicles_df)
+        assigned = [[] for _ in range(v)]
+        if n == 0 or v == 0:
+            return assigned
+
+        coords = orders_df[['lat', 'lon']].values
+        depots = vehicles_df[['deposito_lat', 'deposito_lon']].values
+
+        # Si los depósitos son distintos, asignar cada pedido al depósito más cercano.
+        # Si todos los depósitos coinciden, hacer k-means para crear k zonas.
+        depots_unique = np.unique(depots, axis=0)
+        if len(depots_unique) > 1:
+            for i in range(n):
+                dists = np.sum((depots - coords[i]) ** 2, axis=1)
+                assigned[int(np.argmin(dists))].append(i)
+            return assigned
+
+        # K-means determinista para particionar la nube de pedidos en v zonas.
+        np.random.seed(7)
+        k = min(v, n)
+        centroids = coords[np.random.choice(n, k, replace=False)]
+        for _ in range(20):
+            labels = np.array([
+                int(np.argmin(np.sum((coords[i] - centroids) ** 2, axis=1))) for i in range(n)
+            ])
+            new_centroids = np.array([
+                coords[labels == j].mean(axis=0) if np.any(labels == j) else centroids[j]
+                for j in range(k)
+            ])
+            if np.allclose(centroids, new_centroids):
+                break
+            centroids = new_centroids
+        for i in range(n):
+            assigned[int(labels[i])].append(i)
+        return assigned
 
     def simulate_manual_baseline(self, orders_df, vehicles_df, dist_matrix, time_matrix):
-        """
-        Simula un reparto manual avanzado que sigue tres reglas heurísticas humanas:
-        1. Pedidos urgentes primero (prioridad 3 > 2 > 1) e intentar respetar ventanas horarias.
-        2. Lógica del Vecino Más Cercano (Nearest Neighbor) desde la posición actual.
-        3. Pedidos más pesados se entregan antes para vaciar carga rápido.
-        """
+        """Plan manual realista: zona por vehículo + orden por urgencia de ventana."""
+
         num_vehicles = len(vehicles_df)
-        num_orders = len(orders_df)
-        
-        # Asignar pedidos equitativamente en bloques según el orden del CSV
-        assigned_orders = [[] for _ in range(num_vehicles)]
-        for idx, row in orders_df.iterrows():
-            v_idx = idx % num_vehicles
-            assigned_orders[v_idx].append(idx) # Guardamos el índice original
-            
+        if len(orders_df) == 0:
+            return {
+                'tipo_planificacion': 'Manual Heurístico (Zona + Urgencia de Ventana)',
+                'vehiculos_activos': 0, 'distancia_total_km': 0.0, 'tiempo_total_horas': 0.0,
+                'coste_total_euros': 0.0, 'co2_total_kg': 0.0, 'pedidos_retrasados': 0,
+                'incidentes_sobrecarga': 0, 'rutas': [], 'used_fallback': False,
+            }
+
+        # 1. Asignación por zona (cómo el despachador mira el mapa).
+        assigned = self._assign_by_zone(orders_df, vehicles_df)
+
         routes_summary = []
         total_km = 0.0
         total_time_min = 0.0
         total_delayed = 0
         total_overloaded_incidents = 0
-        
+
         for v_idx in range(num_vehicles):
             vehicle = vehicles_df.iloc[v_idx]
-            v_order_indices = assigned_orders[v_idx]
-            
-            if not v_order_indices:
+            order_indices = assigned[v_idx]
+            if not order_indices:
                 continue
-                
-            unvisited = set(v_order_indices)
-            route_stops = []
-            
+
+            # 2. Dentro de la zona, el humano ordena por urgencia: prioridad alta
+            # primero (3 > 2 > 1), y dentro del mismo nivel por ventana que vence
+            # antes. Es la heurística mental real, no un score matemático.
+            order_indices_sorted = sorted(
+                order_indices,
+                key=lambda i: (
+                    -int(orders_df.iloc[i]['prioridad']),
+                    int(orders_df.iloc[i]['minutos_fin']),
+                ),
+            )
+
             current_time = vehicle['minutos_inicio']
-            current_node = 0 # Depósito
+            current_node = 0  # Depósito
             route_distance = 0.0
             route_time_travel = 0.0
             current_load = 0.0
-            
             stop_details = []
-            
-            # Peso máximo del dataset para escala de penalización (aproximadamente 130 kg)
-            max_dataset_weight = 150.0
-            
-            # Recorrer de forma secuencial mediante la heurística del conductor humano
-            while unvisited:
-                best_cand = None
-                best_score = float('inf')
-                
-                for cand in unvisited:
-                    order_row = orders_df.iloc[cand]
-                    cand_node = cand + 1
-                    
-                    dist = dist_matrix[current_node, cand_node]
-                    
-                    # Regra 1: Los pedidos más urgentes primero (prioridad 3 > 2 > 1)
-                    # Convertimos prioridad a coste penalizando la baja prioridad
-                    prioridad_cost = (3 - order_row['prioridad']) * 40.0
-                    
-                    # Ventanas horarias: Priorizar las que vencen antes
-                    ventana_cost = order_row['minutos_fin'] * 0.1
-                    
-                    # Regra 2: Lógica del vecino más cercano
-                    dist_cost = dist * 2.0
-                    
-                    # Regra 3: Los pedidos más pesados se entregan antes (penalizar los más ligeros)
-                    peso_cost = (max_dataset_weight - order_row['peso_kg']) * 0.2
-                    
-                    score = prioridad_cost + ventana_cost + dist_cost + peso_cost
-                    
-                    if score < best_score:
-                        best_score = score
-                        best_cand = cand
-                        
-                # Seleccionar el mejor candidato según la heurística humana
-                cand_order_row = orders_df.iloc[best_cand]
-                cand_node = best_cand + 1
-                
-                # Viajar a la parada
-                dist_to_cand = dist_matrix[current_node, cand_node]
-                time_to_cand = time_matrix[current_node, cand_node]
-                
-                route_distance += dist_to_cand
-                route_time_travel += time_to_cand
-                
-                # Llegada y tiempo de espera si llega antes
-                current_time += time_to_cand
-                if current_time < cand_order_row['minutos_inicio']:
-                    current_time = cand_order_row['minutos_inicio']
-                    
-                arrival_time_str = self._minutes_to_time_str(current_time)
-                
-                # Comprobar si llega con retraso
-                is_delayed = current_time > cand_order_row['minutos_fin']
+
+            for idx in order_indices_sorted:
+                order_row = orders_df.iloc[idx]
+                node = idx + 1
+
+                dist_to = dist_matrix[current_node, node]
+                time_to = time_matrix[current_node, node]
+                route_distance += dist_to
+                route_time_travel += time_to
+                current_time += time_to
+                if current_time < order_row['minutos_inicio']:
+                    current_time = order_row['minutos_inicio']  # Esperar a apertura
+
+                is_delayed = current_time > order_row['minutos_fin']
                 if is_delayed:
                     total_delayed += 1
-                    
-                current_load += cand_order_row['peso_kg']
-                
+                current_load += order_row['peso_kg']
+
                 stop_details.append({
-                    'id_pedido': cand_order_row['id_pedido'],
-                    'cliente': cand_order_row['cliente'],
-                    'prioridad': int(cand_order_row['prioridad']),
-                    'peso_kg': float(cand_order_row['peso_kg']),
-                    'hora_llegada': arrival_time_str,
-                    'retrasado': is_delayed,
-                    'ventana': f"{cand_order_row['franja_inicio']}-{cand_order_row['franja_fin']}"
+                    'id_pedido': order_row['id_pedido'],
+                    'cliente': order_row['cliente'],
+                    'prioridad': int(order_row['prioridad']),
+                    'peso_kg': float(order_row['peso_kg']),
+                    'hora_llegada': self._minutes_to_time_str(current_time),
+                    'retrasado': bool(is_delayed),
+                    'ventana': f"{order_row['franja_inicio']}-{order_row['franja_fin']}",
                 })
-                
                 current_time += self.service_time_min
-                current_node = cand_node
-                unvisited.remove(best_cand)
-                route_stops.append(best_cand)
-                
+                current_node = node
+
             # Regreso al depósito
             dist_to_depot = dist_matrix[current_node, 0]
             time_to_depot = time_matrix[current_node, 0]
-            
             route_distance += dist_to_depot
             route_time_travel += time_to_depot
             current_time += time_to_depot
-            
+
             total_km += route_distance
             total_time_min += (current_time - vehicle['minutos_inicio'])
-            
+
             is_overloaded = current_load > vehicle['capacidad_kg']
             if is_overloaded:
                 total_overloaded_incidents += 1
-                
+
             cost = route_distance * vehicle['coste_por_km']
-            co2_factor = self.co2_g_per_km_electric if 'Electr' in vehicle['nombre'] else self.co2_g_per_km_diesel
+            co2_factor = (
+                self.co2_g_per_km_electric if 'Electr' in vehicle['nombre']
+                else self.co2_g_per_km_diesel
+            )
             co2_emissions_kg = (route_distance * co2_factor) / 1000.0
-            
+
             routes_summary.append({
                 'id_vehiculo': vehicle['id_vehiculo'],
                 'nombre_vehiculo': vehicle['nombre'],
-                'pedidos_entregados': len(route_stops),
+                'pedidos_entregados': len(order_indices_sorted),
                 'distancia_km': route_distance,
                 'tiempo_total_min': current_time - vehicle['minutos_inicio'],
                 'tiempo_viaje_min': route_time_travel,
@@ -154,11 +186,11 @@ class MetricsEngine:
                 'co2_emissions_kg': co2_emissions_kg,
                 'sobrecargado': is_overloaded,
                 'carga_total_kg': current_load,
-                'detalle_paradas': stop_details
+                'detalle_paradas': stop_details,
             })
-            
+
         return {
-            'tipo_planificacion': 'Manual Heurístico (Reglas de Conductor)',
+            'tipo_planificacion': 'Manual Heurístico (Zona + Urgencia de Ventana)',
             'vehiculos_activos': len(routes_summary),
             'distancia_total_km': total_km,
             'tiempo_total_horas': total_time_min / 60.0,
@@ -166,55 +198,45 @@ class MetricsEngine:
             'co2_total_kg': sum(r['co2_emissions_kg'] for r in routes_summary),
             'pedidos_retrasados': total_delayed,
             'incidentes_sobrecarga': total_overloaded_incidents,
-            'rutas': routes_summary
+            'rutas': routes_summary,
+            'used_fallback': False,
         }
 
     def compare_plans(self, manual_res, optimized_res):
-        """
-        Compara el plan manual con el plan optimizado y genera el cuadro de ahorros.
-        """
+        """Genera el cuadro de ahorros del plan optimizado vs el baseline manual."""
+
+        def _safe_pct(saving, base):
+            return (saving / base) * 100 if base > 0 else 0.0
+
         km_saving = manual_res['distancia_total_km'] - optimized_res['distancia_total_km']
-        km_saving_pct = (km_saving / manual_res['distancia_total_km']) * 100 if manual_res['distancia_total_km'] > 0 else 0
-        
         cost_saving = manual_res['coste_total_euros'] - optimized_res['coste_total_euros']
-        cost_saving_pct = (cost_saving / manual_res['coste_total_euros']) * 100 if manual_res['coste_total_euros'] > 0 else 0
-        
         co2_saving = manual_res['co2_total_kg'] - optimized_res['co2_total_kg']
-        co2_saving_pct = (co2_saving / manual_res['co2_total_kg']) * 100 if manual_res['co2_total_kg'] > 0 else 0
-        
-        retrasos_evitados = manual_res['pedidos_retrasados'] - optimized_res['pedidos_retrasados']
-        sobrecargas_evitadas = manual_res['incidentes_sobrecarga'] - optimized_res['incidentes_sobrecarga']
-        
+
         return {
             'distancia_manual_km': manual_res['distancia_total_km'],
             'distancia_optimizada_km': optimized_res['distancia_total_km'],
             'ahorro_distancia_km': km_saving,
-            'ahorro_distancia_pct': km_saving_pct,
-            
+            'ahorro_distancia_pct': _safe_pct(km_saving, manual_res['distancia_total_km']),
+
             'coste_manual_euros': manual_res['coste_total_euros'],
             'coste_optimizado_euros': optimized_res['coste_total_euros'],
             'ahorro_coste_euros': cost_saving,
-            'ahorro_coste_pct': cost_saving_pct,
-            
+            'ahorro_coste_pct': _safe_pct(cost_saving, manual_res['coste_total_euros']),
+
             'co2_manual_kg': manual_res['co2_total_kg'],
             'co2_optimizado_kg': optimized_res['co2_total_kg'],
             'ahorro_co2_kg': co2_saving,
-            'ahorro_co2_pct': co2_saving_pct,
-            
+            'ahorro_co2_pct': _safe_pct(co2_saving, manual_res['co2_total_kg']),
+
             'retrasos_manual': manual_res['pedidos_retrasados'],
             'retrasos_optimizado': optimized_res['pedidos_retrasados'],
-            'retrasos_evitados': retrasos_evitados,
-            
+            'retrasos_evitados': manual_res['pedidos_retrasados'] - optimized_res['pedidos_retrasados'],
+
             'sobrecargas_manual': manual_res['incidentes_sobrecarga'],
             'sobrecargas_optimizado': optimized_res['incidentes_sobrecarga'],
-            'sobrecargas_evitadas': sobrecargas_evitadas
+            'sobrecargas_evitadas': manual_res['incidentes_sobrecarga'] - optimized_res['incidentes_sobrecarga'],
         }
 
     def _minutes_to_time_str(self, minutes_since_midnight):
-        """
-        Convierte minutos totales a cadena de formato HH:MM.
-        """
-        minutes_since_midnight = int(minutes_since_midnight) % 1440
-        hours = minutes_since_midnight // 60
-        minutes = minutes_since_midnight % 60
-        return f"{hours:02d}:{minutes:02d}"
+        m = int(minutes_since_midnight) % 1440
+        return f"{m // 60:02d}:{m % 60:02d}"
