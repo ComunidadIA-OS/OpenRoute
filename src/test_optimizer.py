@@ -224,6 +224,61 @@ class TestHardConstraints(unittest.TestCase):
         self.assertEqual(plan["rutas"], [])
 
 
+class TestJsonSerializable(unittest.TestCase):
+    """Regresión del bug "'numpy.bool' object is not iterable" en FastAPI.
+
+    El response del motor termina serializándose con FastAPI/jsonable_encoder,
+    que NO sabe encodear numpy.bool_ (lo trata como dict iterable). Si una
+    comparación numpy se cuela como bool sin envolver, el endpoint cae con
+    500 sin cuerpo. Los tests siguientes garantizan que todos los campos
+    booleanos de los planes son Python bool 'duros'.
+    """
+
+    def _assert_no_numpy_bool(self, obj, path="root"):
+        import numpy as np
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                self._assert_no_numpy_bool(v, f"{path}.{k}")
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                self._assert_no_numpy_bool(v, f"{path}[{i}]")
+        elif isinstance(obj, np.bool_):
+            self.fail(f"numpy.bool_ encontrado en {path}: {obj!r} — envolver con bool()")
+        elif isinstance(obj, bool):
+            return  # bool de Python OK
+
+    def _setup_overloaded_dataset(self):
+        """Dataset diseñado para que algún vehículo se sobrecargue en el
+        baseline manual y el plan optimizado: así se ejerce el camino
+        'sobrecargado'=True que es donde se materializa el bug."""
+        orders = pd.DataFrame([
+            _order("P1", 38.27, -0.69, 80.0),
+            _order("P2", 38.28, -0.70, 80.0),
+            _order("P3", 38.26, -0.68, 80.0),
+        ])
+        vehicles = pd.DataFrame([_vehicle("V1", capacidad=100.0)])  # carga total 240 > 100
+        processor = DataProcessor()
+        depot_lat, depot_lon = vehicles.loc[0, "deposito_lat"], vehicles.loc[0, "deposito_lon"]
+        dist, time = processor.build_distance_matrix(depot_lat, depot_lon, orders, use_osrm=False)
+        return orders, vehicles, dist, time
+
+    def test_baseline_response_is_pure_python_bools(self):
+        orders, vehicles, dist, time = self._setup_overloaded_dataset()
+        plan = MetricsEngine().simulate_manual_baseline(orders, vehicles, dist, time)
+        # Confirmamos que la sobrecarga REALMENTE se dispara, si no el test no
+        # ejercita el camino que tenía el bug.
+        self.assertGreaterEqual(plan["incidentes_sobrecarga"], 1)
+        self._assert_no_numpy_bool(plan)
+
+    def test_optimizer_response_is_pure_python_bools(self):
+        orders, vehicles, dist, time = self._setup_overloaded_dataset()
+        # Forzamos heurística para no depender del solver de OR-Tools en este test.
+        plan = RouteOptimizerFactory.get_optimizer("heuristic").optimize(
+            orders, vehicles, dist, time
+        )
+        self._assert_no_numpy_bool(plan)
+
+
 class TestMetricsCoherence(unittest.TestCase):
     """La comparativa debe ser coherente con los inputs."""
 
