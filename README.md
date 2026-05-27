@@ -183,8 +183,9 @@ Los endpoints disponibles:
 #### Probar el motor sin UI
 
 ```bash
-# Suite unitaria (10 tests: schema, capacidad, ventanas, fallback, comparativa)
-python -m unittest src/test_optimizer.py -v
+# Suite unitaria (24 tests: schema, capacidad, ventanas, OSRM fallback,
+# bbox configurable, serialización JSON sin numpy.bool)
+OPENROUTE_DISABLE_OSRM=1 python -m unittest src/test_optimizer.py -v
 
 # Test end-to-end con reporte comparativo en consola
 python src/test_run.py
@@ -192,23 +193,20 @@ python src/test_run.py
 
 ### 2C. Frontend conversacional (`web/`) — Terminal 3
 
-Requisitos: **Node.js 20+**, **[Ollama](https://ollama.com/download)** instalado, **~5 GB** libres para el modelo, conexión a internet (para OSRM y Nominatim públicos).
+Requisitos: **Node.js 20+**, **[Ollama](https://ollama.com/download)** ya arrancado en el paso 2A (con `llama3.2:1b` descargado), conexión a internet (para OSRM y Nominatim públicos).
 
 ```bash
-# 1. Descargar el modelo LLM (una sola vez, ~5GB)
-ollama pull llama3.1:8b
-
-# 2. Configurar la app
+# Configurar la app (no hace falta volver a `ollama pull`, ya lo hiciste en 2A)
 cd web
 cp .env.example .env
 # (revisa .env, ajusta JWT_SECRET en producción)
 
-# 3. Instalar dependencias y preparar la DB
+# Instalar dependencias y preparar la DB
 npm install
 npx prisma migrate dev
 npm run db:seed
 
-# 4. Arrancar el servidor de desarrollo
+# Arrancar el servidor de desarrollo
 npm run dev
 ```
 
