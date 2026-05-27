@@ -3,11 +3,22 @@ import json
 import numpy as np
 import pandas as pd
 
+from osrm_client import OSRMClientError, get_default_client, is_disabled as osrm_globally_disabled
+
+
 class DataProcessor:
     """
     Clase encargada de cargar, validar y procesar la información de pedidos y vehículos.
-    Calcula matrices de distancia y tiempo utilizando fórmulas geodésicas (Haversine)
-    ajustadas con coeficientes reales de circulación urbana.
+
+    Para la matriz de distancias usa OSRM /table por defecto (callejero real),
+    cayendo a Haversine × factor_urbano si OSRM no responde. Esto permite que el
+    motor optimice sobre distancias verdaderas en lugar de líneas rectas — un
+    cambio importante porque OR-Tools/heurística minimizan exactamente la suma
+    de la matriz, así que si la matriz es Haversine, el "plan óptimo" lo es
+    sobre una aproximación, no sobre la conducción real.
+
+    El fallback Haversine se conserva como red de seguridad: tests offline, CI
+    sin red, jurado evaluando en una sala sin Wi-Fi, OSRM público caído.
     """
     def __init__(self, earth_radius_km=6371.0, traffic_delay_factor=1.3, speed_kmh=35.0):
         self.earth_radius_km = earth_radius_km
@@ -109,26 +120,66 @@ class DataProcessor:
         # Retornar distancia ajustada por factor de trazado real urbano
         return distance_straight * self.traffic_delay_factor
 
-    def build_distance_matrix(self, depot_lat, depot_lon, orders_df):
+    def build_distance_matrix(self, depot_lat, depot_lon, orders_df, use_osrm=None):
         """
-        Construye una matriz de distancias completa (Km) e intervalos de tiempo de viaje (Min).
+        Construye una matriz de distancias completa (km) e intervalos de tiempo de viaje (min).
         El índice 0 representa el depósito (depot) de salida/llegada.
-        Los índices 1 a N representan los pedidos correspondientes a las filas del orders_df.
+        Los índices 1..N representan los pedidos correspondientes a las filas de ``orders_df``.
+
+        Parámetros:
+          use_osrm:
+            - ``None`` (default): intenta OSRM /table; si falla (o si está globalmente
+              desactivado vía ``OPENROUTE_DISABLE_OSRM``), cae silenciosamente a Haversine
+              y devuelve la matriz aproximada. Este es el comportamiento recomendado para
+              producción: real cuando hay red, robusto cuando no.
+            - ``True``: fuerza OSRM. Si OSRM falla, propaga la excepción (útil para
+              validar que la infraestructura está sana).
+            - ``False``: fuerza Haversine (modo previo). Útil en tests deterministas
+              y en CI sin red.
+
+        Devuelve ``(dist_matrix_km, time_matrix_min)``. La etiqueta del método se
+        devuelve por logging via ``self.last_matrix_source`` ('osrm' | 'haversine').
         """
-        n = len(orders_df) + 1
+        coords = self._coords_with_depot(depot_lat, depot_lon, orders_df)
+
+        # Si el llamador fuerza Haversine, ni siquiera intentamos OSRM. Misma
+        # rama si el flag global lo desactiva (CI/tests offline, jurado sin red).
+        if use_osrm is False or (use_osrm is None and osrm_globally_disabled()):
+            self.last_matrix_source = "haversine"
+            return self._haversine_matrix(coords)
+
+        try:
+            client = get_default_client()
+            dist_km, time_min = client.table(coords)
+            # OSRM puede devolver inf si dos puntos no están conectados por calle.
+            # Si toda la matriz es finita, perfecto. Si hay algún inf, lo dejamos
+            # tal cual: el solver lo evitará, y el fallback Haversine alteraría el
+            # resultado de forma silenciosa cuando lo que el usuario querría es saberlo.
+            self.last_matrix_source = "osrm"
+            return dist_km, time_min
+        except OSRMClientError as e:
+            if use_osrm is True:
+                # Modo estricto: el usuario quiere asegurar que OSRM funciona.
+                raise
+            # Modo auto: caída silenciosa pero registrada. El operador puede
+            # comprobar self.last_matrix_source para saber qué se usó.
+            print(f"[OSRM] no disponible, fallback a Haversine: {e}")
+            self.last_matrix_source = "haversine"
+            return self._haversine_matrix(coords)
+
+    def _coords_with_depot(self, depot_lat, depot_lon, orders_df):
+        """Devuelve la lista de tuplas (lat, lon) con el depósito en el índice 0."""
+        coords = [(float(depot_lat), float(depot_lon))]
+        for _, row in orders_df.iterrows():
+            coords.append((float(row["lat"]), float(row["lon"])))
+        return coords
+
+    def _haversine_matrix(self, coords):
+        """Fallback Haversine clásico, idéntico al modo previo del repo."""
+        n = len(coords)
+        lats = np.array([c[0] for c in coords])
+        lons = np.array([c[1] for c in coords])
         dist_matrix = np.zeros((n, n))
-        
-        # Generamos array de coordenadas para facilidad
-        lats = np.zeros(n)
-        lons = np.zeros(n)
-        
-        lats[0] = depot_lat
-        lons[0] = depot_lon
-        
-        lats[1:] = orders_df['lat'].values
-        lons[1:] = orders_df['lon'].values
-        
-        # Rellenar matriz de distancias
         for i in range(n):
             for j in range(n):
                 if i == j:
@@ -137,12 +188,8 @@ class DataProcessor:
                     dist_matrix[i, j] = self.calculate_haversine_distance(
                         lats[i], lons[i], lats[j], lons[j]
                     )
-        
-        # Matriz de tiempos (en minutos) basados en velocidad promedio
-        # velocidad (km/h) / 60 = km por minuto. tiempo (min) = distancia (km) / (velocidad_km_min)
         speed_km_min = self.speed_kmh / 60.0
         time_matrix = dist_matrix / speed_km_min
-        
         return dist_matrix, time_matrix
 
     def add_manual_order(self, orders_df, id_pedido, cliente, direccion, lat, lon, prioridad, peso_kg, franja_inicio, franja_fin, observaciones=""):
