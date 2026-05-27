@@ -69,6 +69,15 @@ type PythonRoute = {
   detalle_paradas: PythonStop[];
 };
 
+type PythonDeferredOrder = {
+  id_pedido: string;
+  cliente: string;
+  prioridad: number;
+  peso_kg: number;
+  ventana: string;
+  motivo: string;
+};
+
 type PythonPlan = {
   tipo_planificacion: string;
   vehiculos_activos: number;
@@ -79,6 +88,9 @@ type PythonPlan = {
   pedidos_retrasados: number;
   incidentes_sobrecarga: number;
   rutas: PythonRoute[];
+  /** Pedidos que OR-Tools no pudo encajar y dejó para replanificar (DISJUNCTIONS).
+   * El chatbot debe avisarlos al usuario. Lista vacía si todo cupo. */
+  pedidos_diferidos: PythonDeferredOrder[];
 };
 
 type PythonComparison = {

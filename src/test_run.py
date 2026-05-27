@@ -1,14 +1,17 @@
+import argparse
 import os
 from data_processor import DataProcessor
 from metrics import MetricsEngine
 from optimizer import RouteOptimizerFactory
 
-def run_test():
+def run_test(orders_path=None, vehicles_path=None):
     # Paths relativos a la raíz del repo (un nivel por encima de src/).
     here = os.path.dirname(os.path.abspath(__file__))
     repo_root = os.path.abspath(os.path.join(here, os.pardir))
-    orders_path = os.path.join(repo_root, "data", "pedidos_ejemplo.csv")
-    vehicles_path = os.path.join(repo_root, "data", "vehiculos_config.json")
+    if orders_path is None:
+        orders_path = os.path.join(repo_root, "data", "pedidos_ejemplo.csv")
+    if vehicles_path is None:
+        vehicles_path = os.path.join(repo_root, "data", "vehiculos_config.json")
     
     print("=" * 60)
     print("INICIANDO PRUEBA COMPLETA DE MOTOR LOGÍSTICO - OPENROUTE")
@@ -55,14 +58,22 @@ def run_test():
     print("=" * 60)
     
     def print_plan_summary(name, res):
+        diferidos = res.get('pedidos_diferidos', [])
+        entregables = len(orders_df) - len(diferidos)
         print(f"\n>> PLAN: {name}")
         print(f"   Vehículos Activos:   {res['vehiculos_activos']}")
         print(f"   Distancia Total:     {res['distancia_total_km']:.2f} km")
         print(f"   Tiempo de Ruta:      {res['tiempo_total_horas']:.2f} horas")
         print(f"   Coste Financiero:    {res['coste_total_euros']:.2f} €")
         print(f"   Emisiones de CO2:    {res['co2_total_kg']:.2f} kg CO2")
-        print(f"   Pedidos Retrasados:  {res['pedidos_retrasados']} de {len(orders_df)}")
+        print(f"   Pedidos Retrasados:  {res['pedidos_retrasados']} de {entregables} servidos")
         print(f"   Sobrecargas Flota:   {res['incidentes_sobrecarga']}")
+        if diferidos:
+            print(f"   Pedidos Diferidos:   {len(diferidos)} (replanificar mañana)")
+            for d in diferidos[:5]:
+                print(f"     - {d['id_pedido']} ({d['cliente']}, {d['peso_kg']:.1f} kg, ventana {d['ventana']})")
+            if len(diferidos) > 5:
+                print(f"     ... y {len(diferidos) - 5} más")
         
     print_plan_summary("Plan Manual (Baseline)", baseline_res)
     print_plan_summary("Heurística Propia", heuristic_res)
@@ -103,5 +114,9 @@ def run_test():
     print("=" * 60)
 
 if __name__ == "__main__":
-    run_test()
+    parser = argparse.ArgumentParser(description="E2E del motor con un dataset arbitrario.")
+    parser.add_argument("--orders", help="Ruta al CSV de pedidos (default: data/pedidos_ejemplo.csv)")
+    parser.add_argument("--vehicles", help="Ruta al JSON de vehículos (default: data/vehiculos_config.json)")
+    args = parser.parse_args()
+    run_test(orders_path=args.orders, vehicles_path=args.vehicles)
 

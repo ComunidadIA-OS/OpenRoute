@@ -242,6 +242,7 @@ class HeuristicRouteOptimizer(RouteOptimizer):
             'incidentes_sobrecarga': total_overloaded_incidents,
             'rutas': routes_summary,
             'used_fallback': False,
+            'pedidos_diferidos': [],
         }
 
     def _minutes_to_time_str(self, minutes):
@@ -280,6 +281,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                 'vehiculos_activos': 0, 'distancia_total_km': 0.0, 'tiempo_total_horas': 0.0,
                 'coste_total_euros': 0.0, 'co2_total_kg': 0.0, 'pedidos_retrasados': 0,
                 'incidentes_sobrecarga': 0, 'rutas': [], 'used_fallback': False,
+                'pedidos_diferidos': [],
             }
 
         # 1. Estructura de Datos para OR-Tools
@@ -377,7 +379,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
             vehicle_row = vehicles_df.iloc[vehicle_id]
             start_index = routing.Start(vehicle_id)
             end_index = routing.End(vehicle_id)
-            
+
             time_dimension.CumulVar(start_index).SetRange(
                 int(vehicle_row['minutos_inicio'] * precision_factor),
                 int(vehicle_row['minutos_fin'] * precision_factor)
@@ -386,7 +388,21 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                 int(vehicle_row['minutos_inicio'] * precision_factor),
                 int(vehicle_row['minutos_fin'] * precision_factor)
             )
-            
+
+        # 6b. DISJUNCTIONS: permitir descartar pedidos infactibles con penalización.
+        # Sin esto, una sola ventana imposible hace que TODO el solver devuelva
+        # "no factible" y caigamos a la heurística. Con disjunctions, OR-Tools
+        # entrega lo máximo posible y reporta los pedidos diferidos.
+        #
+        # Penalización = max(distancia) × 10. Suficientemente alta para que el
+        # solver prefiera entregar siempre que sea posible, pero finita para que
+        # pueda descartar cuando es realmente imposible. Si el dataset es 100%
+        # factible, ningún pedido se diferirá.
+        max_dist = max((max(row) for row in data['distance_matrix']), default=0)
+        disjunction_penalty = max(int(max_dist * 10), 1)
+        for node_idx in range(1, num_nodes):
+            routing.AddDisjunction([manager.NodeToIndex(node_idx)], disjunction_penalty)
+
         # 7. Parámetros de Búsqueda
         search_parameters = pywrapcp.DefaultRoutingSearchParameters()
         # Heurística inicial
@@ -418,6 +434,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
             result = fallback.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
             result['used_fallback'] = True
             result['fallback_reason'] = "ortools_infeasible"
+            result.setdefault('pedidos_diferidos', [])
             # Mantenemos tipo_planificacion del fallback para que sea evidente en logs.
             return result
             
@@ -426,7 +443,8 @@ class ORToolsRouteOptimizer(RouteOptimizer):
         total_time_min = 0.0
         total_delayed = 0
         total_overloaded_incidents = 0
-        
+        visited_nodes = set()  # para detectar pedidos diferidos por disjunctions
+
         for vehicle_id in range(data['num_vehicles']):
             vehicle_row = vehicles_df.iloc[vehicle_id]
             index = routing.Start(vehicle_id)
@@ -441,6 +459,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                 node_idx = manager.IndexToNode(index)
                 
                 if node_idx != 0: # Saltar el depósito en el detalle de paradas
+                    visited_nodes.add(node_idx)
                     order_row = orders_df.iloc[node_idx - 1]
                     
                     time_var = time_dimension.CumulVar(index)
@@ -501,7 +520,24 @@ class ORToolsRouteOptimizer(RouteOptimizer):
                 
                 total_km += route_distance
                 total_time_min += (end_time_min - vehicle_row['minutos_inicio'])
-                
+
+        # Pedidos diferidos: aquellos que las disjunctions descartaron por
+        # infactibilidad. El cliente debe mostrarlos al usuario como "no caben
+        # hoy, replanificar mañana" — son el output más útil cuando la demanda
+        # supera la capacidad realista de la flota.
+        pedidos_diferidos = []
+        for node_idx in range(1, num_nodes):
+            if node_idx not in visited_nodes:
+                order_row = orders_df.iloc[node_idx - 1]
+                pedidos_diferidos.append({
+                    'id_pedido': str(order_row['id_pedido']),
+                    'cliente': str(order_row['cliente']),
+                    'prioridad': int(order_row['prioridad']),
+                    'peso_kg': float(order_row['peso_kg']),
+                    'ventana': f"{order_row['franja_inicio']}-{order_row['franja_fin']}",
+                    'motivo': 'infactible_con_restricciones_actuales',
+                })
+
         return {
             'tipo_planificacion': 'Google OR-Tools (Optimizador Global CVRPTW)',
             'vehiculos_activos': len(routes_summary),
@@ -513,6 +549,7 @@ class ORToolsRouteOptimizer(RouteOptimizer):
             'incidentes_sobrecarga': total_overloaded_incidents,
             'rutas': routes_summary,
             'used_fallback': False,
+            'pedidos_diferidos': pedidos_diferidos,
         }
 
     def _minutes_to_time_str(self, minutes):

@@ -163,19 +163,47 @@ class TestHardConstraints(unittest.TestCase):
         self.assertEqual(plan["pedidos_retrasados"], 0,
                          "OR-Tools entregó tarde con ventanas anchas y 2 paradas — falla de configuración")
 
-    def test_ortools_marks_fallback_when_infeasible(self):
-        """Con ventanas imposibles, OR-Tools debe devolver el flag used_fallback=True."""
-        # Capacidad insuficiente para una sola parada que pesa más que la capacidad total
+    def test_ortools_defers_infeasible_orders_via_disjunctions(self):
+        """Con un pedido imposible de servir, OR-Tools debe diferirlo (no fallar)."""
+        # Capacidad insuficiente: 500kg en vehículo de 10kg → infactible.
+        # Con DISJUNCTIONS el solver descarta el pedido con penalización en lugar
+        # de devolver "no factible".
         vehicles = pd.DataFrame([_vehicle(capacidad=10.0)])
         orders = pd.DataFrame([
-            _order("P1", 38.2725, -0.6782, 500.0),  # 500 kg en vehículo de 10 kg
+            _order("P1", 38.2725, -0.6782, 500.0),
         ])
         dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
 
         plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
-        # Tras el cambio, OR-Tools debe marcar fallback explícitamente
-        self.assertTrue(plan.get("used_fallback", False),
-                        "OR-Tools cayó a heurística pero no marcó used_fallback")
+
+        # OR-Tools sí encuentra solución (la solución es "no entregar nada").
+        self.assertFalse(plan.get("used_fallback", False),
+                         "Con disjunctions OR-Tools no debería caer a fallback")
+        # El pedido infactible debe aparecer en pedidos_diferidos.
+        diferidos = plan.get("pedidos_diferidos", [])
+        self.assertEqual(len(diferidos), 1, f"Esperaba 1 pedido diferido, got {len(diferidos)}")
+        self.assertEqual(diferidos[0]["id_pedido"], "P1")
+        self.assertEqual(diferidos[0]["motivo"], "infactible_con_restricciones_actuales")
+
+    def test_ortools_serves_feasible_orders_and_defers_only_infeasible(self):
+        """Mezcla de pedidos factibles + uno imposible: serve los factibles, difiere el otro."""
+        vehicles = pd.DataFrame([_vehicle(capacidad=100.0)])
+        orders = pd.DataFrame([
+            _order("OK1", 38.2725, -0.6782, 20.0),  # cabe
+            _order("OK2", 38.2750, -0.6870, 30.0),  # cabe
+            _order("BIG", 38.2810, -0.6990, 500.0), # NO cabe
+        ])
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+
+        plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
+
+        self.assertFalse(plan.get("used_fallback", False))
+        served_ids = {s["id_pedido"] for r in plan["rutas"] for s in r["detalle_paradas"]}
+        deferred_ids = {d["id_pedido"] for d in plan.get("pedidos_diferidos", [])}
+        self.assertIn("OK1", served_ids)
+        self.assertIn("OK2", served_ids)
+        self.assertIn("BIG", deferred_ids)
+        self.assertNotIn("BIG", served_ids)
 
     def test_empty_orders_returns_valid_empty_plan(self):
         vehicles = pd.DataFrame([_vehicle()])
