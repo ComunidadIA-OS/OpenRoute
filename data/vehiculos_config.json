@@ -4,8 +4,8 @@
     "nombre": "Furgoneta Eléctrica (Elche/Alicante)",
     "capacidad_kg": 700,
     "coste_por_km": 0.15,
-    "hora_inicio": "08:00",
-    "hora_fin": "16:00",
+    "hora_inicio": "06:00",
+    "hora_fin": "20:00",
     "deposito_lat": 38.2743,
     "deposito_lon": -0.6865,
     "zona_preferente": "Elche"
@@ -15,8 +15,8 @@
     "nombre": "Furgoneta Diésel (Alicante Este)",
     "capacidad_kg": 900,
     "coste_por_km": 0.35,
-    "hora_inicio": "08:30",
-    "hora_fin": "17:30",
+    "hora_inicio": "06:00",
+    "hora_fin": "20:00",
     "deposito_lat": 38.2743,
     "deposito_lon": -0.6865,
     "zona_preferente": "Alicante"
@@ -26,8 +26,8 @@
     "nombre": "Furgoneta de Apoyo (Cercanías Elche)",
     "capacidad_kg": 600,
     "coste_por_km": 0.22,
-    "hora_inicio": "09:00",
-    "hora_fin": "15:00",
+    "hora_inicio": "06:00",
+    "hora_fin": "20:00",
     "deposito_lat": 38.2743,
     "deposito_lon": -0.6865,
     "zona_preferente": "Elche"
