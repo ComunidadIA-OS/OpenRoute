@@ -6,6 +6,10 @@ import { prisma } from "./prisma";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-me";
 const COOKIE_NAME = "openroute2_session";
 
+// bcrypt cost factor. 12 ≈ 250-300 ms en CPU moderna — recomendación OWASP 2024
+// para web auth. Suficiente para login interactivo sin saturar el servidor en seed.
+const BCRYPT_ROUNDS = 12;
+
 export type SessionPayload = {
   userId: string;
   username: string;
@@ -66,7 +70,7 @@ export async function authenticateUser(
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 8);
+  return bcrypt.hash(password, BCRYPT_ROUNDS);
 }
 
 export const SESSION_COOKIE_NAME = COOKIE_NAME;

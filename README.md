@@ -3,7 +3,7 @@
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Streamlit App](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js 14](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org)
 [![Ollama llama3.1](https://img.shields.io/badge/Ollama-llama3.1:8b-1a531a?logo=ollama)](https://ollama.com)
 [![Hackathon](https://img.shields.io/badge/Hackathon-IA_Responsable_y_Abierta-000000?logo=github)](https://github.com/ComunidadIA-OS)
@@ -224,10 +224,12 @@ Este proyecto sigue el [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md
 OpenRoute se apoya en el ecosistema open source. Devolvemos visibilidad a los proyectos sobre los que está construido:
 
 **Backend Python:**
-- **[Streamlit](https://streamlit.io/)** (Apache 2.0) — interfaz interactiva.
+- **[FastAPI](https://fastapi.tiangolo.com/)** (MIT) — microservicio HTTP del motor.
+- **[Uvicorn](https://www.uvicorn.org/)** (BSD-3) — servidor ASGI.
 - **[pandas](https://pandas.pydata.org/)** (BSD-3) — procesamiento de datos.
-- **[Google OR-Tools](https://developers.google.com/optimization)** (Apache 2.0) — solver VRP.
-- **[Folium](https://python-visualization.github.io/folium/)** (MIT) / **[Pydeck](https://deckgl.readthedocs.io/)** (MIT) — visualización geográfica.
+- **[NumPy](https://numpy.org/)** (BSD-3) — cómputo numérico y matrices.
+- **[Google OR-Tools](https://developers.google.com/optimization)** (Apache 2.0) — solver VRP (CVRPTW).
+- **[Pydantic](https://docs.pydantic.dev/)** (MIT) — validación de schemas del API.
 
 **Frontend `web/`:**
 - **[Next.js](https://nextjs.org/)** (MIT) — framework full-stack.

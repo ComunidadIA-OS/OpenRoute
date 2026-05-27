@@ -188,6 +188,20 @@ async function loadOrdersForDate(date: Date): Promise<PythonOrderIn[]> {
 }
 
 /**
+ * Perfil operativo por matrícula: hasta que el modelo Vehicle de Prisma tenga
+ * los campos `nombre` y `coste_por_km`, este mapper enriquece los datos de la
+ * DB con los valores reales del JSON de flota. Importante: el motor mira la
+ * subcadena "Electr" en `nombre` para aplicar el factor de CO₂ eléctrico
+ * (40 g/km vs 250 g/km diésel) — sin esto, la métrica de huella de carbono
+ * por vehículo no se diferencia. Plates definidos en prisma/seed.ts.
+ */
+const VEHICLE_PROFILES: Record<string, { nombre: string; coste_por_km: number; zona_preferente: string }> = {
+  "1234-ABC": { nombre: "Furgoneta Eléctrica (Centro)", coste_por_km: 0.15, zona_preferente: "Centro" },
+  "5678-DEF": { nombre: "Furgoneta Diésel (Playa)", coste_por_km: 0.35, zona_preferente: "Playa" },
+  "9012-GHI": { nombre: "Furgoneta Diésel Apoyo (Norte)", coste_por_km: 0.22, zona_preferente: "Norte" },
+};
+
+/**
  * Carga las furgonetas disponibles desde la DB y las convierte al esquema
  * del optimizador Python. El depósito es el del frontend (DEPOT_LAT/LNG).
  */
@@ -199,17 +213,24 @@ async function loadAvailableVehicles(): Promise<PythonVehicleIn[]> {
 
   if (vehicles.length === 0) return [];
 
-  return vehicles.map((v, idx) => ({
-    id_vehiculo: v.plate,
-    nombre: `Furgoneta ${v.plate}`,
-    capacidad_kg: v.capacityKg,
-    coste_por_km: 0.25, // Valor razonable por defecto; no hay campo en DB todavía
-    hora_inicio: "08:00",
-    hora_fin: "18:00",
-    deposito_lat: DEPOT_LAT,
-    deposito_lon: DEPOT_LNG,
-    zona_preferente: idx === 0 ? "Centro" : idx === 1 ? "Playa" : "Norte",
-  }));
+  return vehicles.map((v, idx) => {
+    const profile = VEHICLE_PROFILES[v.plate] ?? {
+      nombre: `Furgoneta ${v.plate}`,
+      coste_por_km: 0.25,
+      zona_preferente: idx === 0 ? "Centro" : idx === 1 ? "Playa" : "Norte",
+    };
+    return {
+      id_vehiculo: v.plate,
+      nombre: profile.nombre,
+      capacidad_kg: v.capacityKg,
+      coste_por_km: profile.coste_por_km,
+      hora_inicio: "08:00",
+      hora_fin: "18:00",
+      deposito_lat: DEPOT_LAT,
+      deposito_lon: DEPOT_LNG,
+      zona_preferente: profile.zona_preferente,
+    };
+  });
 }
 
 /**

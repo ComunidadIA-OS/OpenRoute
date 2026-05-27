@@ -41,12 +41,13 @@ async function main() {
   const v2 = await prisma.vehicle.create({ data: { plate: "5678-DEF", capacityKg: 1200, capacityVol: 14, available: true } });
   const v3 = await prisma.vehicle.create({ data: { plate: "9012-GHI", capacityKg: 500, capacityVol: 6, available: true } });
 
-  // USERS
-  const adminHash = await bcrypt.hash("admin123", 8);
-  const driverHash = await bcrypt.hash("juan123", 8);
-  const mariaHash = await bcrypt.hash("maria123", 8);
-  const carlosHash = await bcrypt.hash("carlos123", 8);
-  const despachoHash = await bcrypt.hash("despacho123", 8);
+  // USERS — bcrypt cost 12 (OWASP 2024 recommendation for interactive web auth).
+  const BCRYPT_ROUNDS = 12;
+  const adminHash = await bcrypt.hash("admin123", BCRYPT_ROUNDS);
+  const driverHash = await bcrypt.hash("juan123", BCRYPT_ROUNDS);
+  const mariaHash = await bcrypt.hash("maria123", BCRYPT_ROUNDS);
+  const carlosHash = await bcrypt.hash("carlos123", BCRYPT_ROUNDS);
+  const despachoHash = await bcrypt.hash("despacho123", BCRYPT_ROUNDS);
 
   await prisma.user.create({
     data: { username: "admin", passwordHash: adminHash, fullName: "Administradora Central", role: "ADMIN" },

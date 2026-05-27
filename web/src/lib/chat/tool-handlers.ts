@@ -404,11 +404,34 @@ export const TOOL_HANDLERS: Record<
 
     const { baseline, optimized, savings } = result;
 
+    // IA RESPONSABLE: si OR-Tools no encontró solución factible, el motor cayó
+    // a la heurística. El bot DEBE avisar al usuario antes de presentar el
+    // resultado como "optimizado por OR-Tools". Idem con los pedidos que las
+    // DISJUNCTIONS descartaron por infactibilidad — son operativamente críticos.
+    const usedFallback = Boolean(result.used_fallback);
+    const fallbackReason = result.fallback_reason ?? null;
+    const pedidosDiferidos = (optimized.pedidos_diferidos ?? []).map((d) => ({
+      id_pedido: d.id_pedido,
+      cliente: d.cliente,
+      peso_kg: Math.round(d.peso_kg * 10) / 10,
+      ventana: d.ventana,
+      motivo: d.motivo,
+    }));
+
     return {
       ok: true,
       data: {
         date: date.toISOString().slice(0, 10),
         motor: optimized.tipo_planificacion,
+        used_fallback: usedFallback,
+        fallback_reason: fallbackReason,
+        aviso_motor: usedFallback
+          ? "OR-Tools no encontró solución factible con las restricciones actuales; el plan mostrado proviene de la heurística de respaldo. NO presentes este resultado como 'optimizado con OR-Tools'."
+          : null,
+        pedidos_diferidos: pedidosDiferidos,
+        aviso_diferidos: pedidosDiferidos.length > 0
+          ? `Hay ${pedidosDiferidos.length} pedido(s) que no caben en la jornada con la flota actual. Avísale al usuario y propón replanificarlos a mañana.`
+          : null,
         plan: {
           vehiculos_activos: optimized.vehiculos_activos,
           distancia_km: Math.round(optimized.distancia_total_km * 10) / 10,
