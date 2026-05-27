@@ -246,6 +246,95 @@ class TestMetricsCoherence(unittest.TestCase):
         self.assertEqual(savings["sobrecargas_evitadas"], 1)
 
 
+class TestBbox(unittest.TestCase):
+    """El bbox de DataProcessor debe ser configurable: argumento explícito,
+    env var, y default Alicante/Elche. Pedidos fuera del bbox se descartan
+    silenciosamente (la cuenta queda visible en len antes vs len después).
+
+    Los tests cubren el caso de uso TRL5: una pyme de otra ciudad sube su
+    CSV y debe poder configurar el bbox sin tocar código.
+    """
+
+    SEVILLA_BBOX = (37.0, 38.0, -6.5, -5.5)
+    SEVILLA_ORDER = _order("SEV-1", 37.3886, -5.9823, 10.0)  # Catedral de Sevilla
+    ALICANTE_ORDER = _order("ALC-1", 38.2725, -0.6782, 10.0)  # Altabix, Elche
+
+    def test_default_bbox_keeps_alicante_discards_sevilla(self):
+        processor = DataProcessor()  # default = Alicante/Elche
+        self.assertEqual(processor.bbox, DataProcessor.DEFAULT_BBOX)
+        df = pd.DataFrame([self.ALICANTE_ORDER, self.SEVILLA_ORDER])
+        out = processor.validate_orders(df)
+        ids = set(out["id_pedido"].tolist())
+        self.assertIn("ALC-1", ids)
+        self.assertNotIn("SEV-1", ids, "Default bbox no debería aceptar coords de Sevilla")
+
+    def test_explicit_bbox_overrides_default(self):
+        processor = DataProcessor(bbox=self.SEVILLA_BBOX)
+        df = pd.DataFrame([self.ALICANTE_ORDER, self.SEVILLA_ORDER])
+        out = processor.validate_orders(df)
+        ids = set(out["id_pedido"].tolist())
+        self.assertIn("SEV-1", ids, "Bbox de Sevilla debería aceptar SEV-1")
+        self.assertNotIn("ALC-1", ids, "Bbox de Sevilla no debería aceptar ALC-1")
+
+    def test_worldwide_bbox_accepts_everything(self):
+        processor = DataProcessor(bbox=DataProcessor.WORLDWIDE_BBOX)
+        df = pd.DataFrame([self.ALICANTE_ORDER, self.SEVILLA_ORDER])
+        out = processor.validate_orders(df)
+        self.assertEqual(len(out), 2, "Worldwide debería aceptar ambas")
+
+    def test_env_var_overrides_default_when_no_arg(self):
+        old = os.environ.get("OPENROUTE_BBOX")
+        os.environ["OPENROUTE_BBOX"] = "37.0,38.0,-6.5,-5.5"
+        try:
+            processor = DataProcessor()  # sin arg → debe leer env
+            self.assertEqual(processor.bbox, self.SEVILLA_BBOX)
+            df = pd.DataFrame([self.SEVILLA_ORDER])
+            out = processor.validate_orders(df)
+            self.assertEqual(len(out), 1)
+        finally:
+            if old is None:
+                os.environ.pop("OPENROUTE_BBOX", None)
+            else:
+                os.environ["OPENROUTE_BBOX"] = old
+
+    def test_env_var_worldwide_keyword(self):
+        old = os.environ.get("OPENROUTE_BBOX")
+        os.environ["OPENROUTE_BBOX"] = "worldwide"
+        try:
+            processor = DataProcessor()
+            self.assertEqual(processor.bbox, DataProcessor.WORLDWIDE_BBOX)
+        finally:
+            if old is None:
+                os.environ.pop("OPENROUTE_BBOX", None)
+            else:
+                os.environ["OPENROUTE_BBOX"] = old
+
+    def test_env_var_invalid_raises(self):
+        old = os.environ.get("OPENROUTE_BBOX")
+        os.environ["OPENROUTE_BBOX"] = "no-soy-un-bbox"
+        try:
+            with self.assertRaises(ValueError):
+                DataProcessor()
+        finally:
+            if old is None:
+                os.environ.pop("OPENROUTE_BBOX", None)
+            else:
+                os.environ["OPENROUTE_BBOX"] = old
+
+    def test_explicit_arg_beats_env_var(self):
+        # Si el llamador pasa bbox explícito, ignora la env: precedencia clara.
+        old = os.environ.get("OPENROUTE_BBOX")
+        os.environ["OPENROUTE_BBOX"] = "worldwide"
+        try:
+            processor = DataProcessor(bbox=self.SEVILLA_BBOX)
+            self.assertEqual(processor.bbox, self.SEVILLA_BBOX)
+        finally:
+            if old is None:
+                os.environ.pop("OPENROUTE_BBOX", None)
+            else:
+                os.environ["OPENROUTE_BBOX"] = old
+
+
 class TestOSRMFallback(unittest.TestCase):
     """El motor debe degradar a Haversine de forma silenciosa cuando OSRM no
     responde, y de forma estricta cuando el llamador exige OSRM (use_osrm=True)."""
