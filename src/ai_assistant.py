@@ -8,12 +8,12 @@ class OllamaClient:
 
     Configurable vía variables de entorno:
       OLLAMA_BASE_URL  (default: http://localhost:11434)
-      OLLAMA_MODEL     (default: llama3.1:8b)
+      OLLAMA_MODEL     (default: llama3.2:3b)
     """
 
     def __init__(self, base_url=None, model=None, timeout=120):
         self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-        self.model = model or os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+        self.model = model or os.getenv("OLLAMA_MODEL", "llama3.2:3b")
         self.timeout = timeout
 
     def ping(self) -> bool:

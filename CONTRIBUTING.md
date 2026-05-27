@@ -100,7 +100,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 
 # Frontend Next.js + Ollama — terminal 2
-ollama pull llama3.2:1b              # modelo activo por defecto
+ollama pull llama3.2:3b              # modelo activo por defecto
 cd web
 cp .env.example .env
 npm install

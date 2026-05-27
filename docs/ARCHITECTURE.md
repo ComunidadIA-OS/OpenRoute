@@ -81,7 +81,7 @@ Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python 
                           │          │        │
               ┌───────────▼──┐  ┌────▼────┐  ┌▼──────────────┐
               │ OLLAMA       │  │ OSRM    │  │ NOMINATIM     │
-              │ llama3.1:8b  │  │ /trip   │  │ /search       │
+              │ llama3.2:3b  │  │ /trip   │  │ /search       │
               │ :11434       │  │ /route  │  │ (geocoding)   │
               └──────────────┘  └─────────┘  └───────────────┘
 ```
@@ -92,10 +92,10 @@ Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python 
 
 **SQLite + Prisma 6**: cero configuración para demo. La migración a PostgreSQL es solo un cambio de `DATABASE_URL` (Prisma soporta ambos).
 
-**Ollama + llama3.1:8b en lugar de API en la nube**:
+**Ollama + llama3.2:3b en lugar de API en la nube**:
 - **Privacidad**: los datos de pedidos no salen de la máquina del usuario.
 - **Coste**: cero por consulta una vez descargado el modelo (~5GB).
-- **Tool calling nativo**: llama3.1:8b soporta function calling sin trucos.
+- **Tool calling nativo**: llama3.2:3b soporta function calling sin trucos.
 - **Trade-off conocido**: ocasionalmente emite los tool calls como JSON en texto en lugar de usar el campo `tool_calls`. Solucionado con `lib/chat/parse-tool-calls.ts` (parser tolerante).
 
 **Leaflet + OSRM público**: gratis, sin API key, sin lock-in. OSRM `/trip` resuelve TSP simple - suficiente para 10-15 paradas. Para casos VRP con time windows estrictas, el roadmap contempla delegar al backend Python con OR-Tools.

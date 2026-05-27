@@ -110,14 +110,14 @@ savings = metrics.compare_plans(manual_res, optimized_res)
 
 ### 3. Generar el informe explicativo en lenguaje natural
 
-El asistente IA usa **Ollama local** (`llama3.1:8b`) por defecto. Si Ollama
+El asistente IA usa **Ollama local** (`llama3.2:3b`) por defecto. Si Ollama
 no está disponible, cae automáticamente al motor de plantillas
 heurísticas locales sin necesidad de intervención del cliente.
 
 ```python
 from src.ai_assistant import AIAssistant
 
-# Configuración por defecto: localhost:11434 + llama3.1:8b
+# Configuración por defecto: localhost:11434 + llama3.2:3b
 ai = AIAssistant()
 
 # Personalización opcional vía argumentos o variables de entorno
@@ -130,7 +130,7 @@ report_markdown = ai.generate_explanation(optimized_res, savings)
 **Requisito**: tener Ollama instalado y el modelo descargado.
 
 ```bash
-ollama pull llama3.1:8b
+ollama pull llama3.2:3b
 ollama serve   # arranca el daemon (en Windows ya arranca como servicio)
 ```
 

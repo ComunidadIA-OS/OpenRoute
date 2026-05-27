@@ -11,7 +11,7 @@
 OpenRoute es un sistema de optimización de rutas logísticas para PYMEs que combina:
 
 - Un **microservicio Python** (FastAPI + Google OR-Tools) que resuelve un VRP con time windows y capacidades reales.
-- Un **frontend conversacional Next.js** con un **LLM local (Ollama + `llama3.1:8b`)** como copiloto del despachador.
+- Un **frontend conversacional Next.js** con un **LLM local (Ollama + `llama3.2:3b`)** como copiloto del despachador.
 
 La herramienta del PNUD se aplica al sistema completo, no a cada componente por separado. La evaluación se centra en:
 
