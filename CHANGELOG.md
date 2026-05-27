@@ -11,6 +11,14 @@ El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y l
 - **Despliegue con Docker**: `Dockerfile` para el microservicio FastAPI, `web/Dockerfile` multi-stage para Next.js con `output: standalone`, `docker-compose.yml` que orquesta los 4 servicios (optimizer + ollama + ollama-pull + web) con healthchecks y dependencias. `docker compose up --build` arranca todo desde cero.
 - **`docker-entrypoint.sh`** del frontend: aplica migraciones Prisma y siembra usuarios demo en el primer arranque; preserva la DB en siguientes reinicios.
 - **`.dockerignore`** en raíz y `web/` para mantener el build context pequeño.
+- **Pre-sembrado de 2 rutas** en `prisma/seed.ts` para que la demo arranque con `/routes` poblado y el mapa Leaflet renderice polyline real sin pasar por el chat.
+- **Botón "Importar al sistema"** en `/import` que persiste los pedidos del CSV en Prisma vía nuevo endpoint `POST /api/orders/import`, cerrando el flujo CSV → /orders → /chat sin tocar a mano la DB.
+
+### Cambiado
+
+- **Modelo LLM por defecto** pasa de `llama3.1:8b` (4.9 GB, lento en CPU sin GPU) a `llama3.2:3b` (2 GB, fiable). El `ollama-pull` deja `llama3.2:1b` descargado como alternativa rápida si el operador quiere experimentar, pero no es el activo (alucina datos y no respeta el protocolo de tool calling).
+- **Parser tolerante de tool calls** ampliado para cubrir 7 esquemas distintos (los modelos pequeños no respetan el protocolo de Ollama y emiten variantes que el parser ahora reconoce sin perder la respuesta natural al usuario).
+- **System prompt** del chatbot añade bloques de **invocación de herramientas** (usar siempre tool_calls estructurado) y **prohibido inventar datos** (responder vacío cuando no hay, no fabricar rutas/pedidos).
 
 Trabajo en curso fuera del hito del hackathon. Ver [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

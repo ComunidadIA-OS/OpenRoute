@@ -39,7 +39,7 @@ Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python 
 5. `ai_assistant.py` opcionalmente explica por qué el solver agrupó ciertas paradas.
 6. El response sale como JSON con plan + baseline + ahorros + pedidos diferidos.
 
-**Fortalezas**: VRP serio con restricciones reales, matriz real por calles, baseline humano honesto (no caricaturizado), pedidos infactibles reportados explícitamente, todo cubierto por 22 tests en `src/test_optimizer.py`.
+**Fortalezas**: VRP serio con restricciones reales, matriz real por calles, baseline humano honesto (no caricaturizado), pedidos infactibles reportados explícitamente, todo cubierto por 24 tests en `src/test_optimizer.py`.
 
 ---
 
@@ -94,7 +94,7 @@ Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python 
 
 **Ollama + llama3.2:3b en lugar de API en la nube**:
 - **Privacidad**: los datos de pedidos no salen de la máquina del usuario.
-- **Coste**: cero por consulta una vez descargado el modelo (~5GB).
+- **Coste**: cero por consulta una vez descargado el modelo activo (~2 GB).
 - **Tool calling nativo**: llama3.2:3b soporta function calling sin trucos.
 - **Trade-off conocido**: ocasionalmente emite los tool calls como JSON en texto en lugar de usar el campo `tool_calls`. Solucionado con `lib/chat/parse-tool-calls.ts` (parser tolerante).
 
@@ -232,7 +232,7 @@ OSRM `/trip` se mantiene como motor TSP rápido para ≤10 paradas; OR-Tools cub
 1. **`lastSuggestions` en memoria por sesión** (`web/src/lib/chat/tool-handlers.ts`): el cache de opciones devueltas por `suggest_routes` vive en un `Map` del proceso. Si el servidor se reinicia o hay varios procesos, se pierde. Mover a Redis o a la propia DB.
 2. **Prisma `Order` no tiene campo `priority`**: hoy todos los pedidos llegan al solver con urgencia media (2). El esquema ya soporta time windows y peso; pendiente añadir `priority` y propagarlo (`web/src/lib/python-optimizer.ts` lo marca como TODO).
 3. **OSRM público se queda en ~100 puntos por petición**: matrices más grandes necesitan partición o auto-hospedaje OSRM. El cliente actual (`src/osrm_client.py`) detecta y propaga el error; el fallback Haversine sigue siendo válido.
-4. **Sin tests E2E del frontend**: el backend Python tiene 22 tests unitarios (`src/test_optimizer.py`), pero la UI Next.js solo tiene lint + build en CI. Pendiente añadir Vitest + Playwright.
+4. **Sin tests E2E del frontend**: el backend Python tiene 24 tests unitarios (`src/test_optimizer.py`), pero la UI Next.js solo tiene lint + build en CI. Pendiente añadir Vitest + Playwright.
 5. **Sin i18n**: textos hardcodeados en español. Si entra mercado internacional, extraer a `next-intl` o similar.
 
 Ver más en [ROADMAP.md](ROADMAP.md).

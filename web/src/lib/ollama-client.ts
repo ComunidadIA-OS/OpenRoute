@@ -2,7 +2,7 @@
 // Avoids the official `ollama` package's Node-specific imports inside server routes.
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.1:8b";
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:3b";
 
 export type ChatRole = "system" | "user" | "assistant" | "tool";
 

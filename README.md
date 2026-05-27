@@ -25,7 +25,7 @@ OpenRoute presenta un **único producto al usuario**: el frontend conversacional
 | Componente | Función | Cómo se invoca | Cuándo se usa |
 |---|---|---|---|
 | **Frontend conversacional (`web/`)** | Next.js 14 + chatbot Ollama + mapa Leaflet + Prisma/SQLite. UI única que ven los usuarios. | `cd web && npm run dev` (puerto 3000) | Siempre. Es la cara del producto. |
-| **Microservicio FastAPI (`app/`)** | Wrapper HTTP sobre el motor VRP de Python (`src/`). Expone `/optimize`, `/baseline`, `/compare`. | `uvicorn app.main:app --port 8000` | Cuando el chatbot llama al tool `optimize_with_ortools`. |
+| **Microservicio FastAPI (`app/`)** | Wrapper HTTP sobre el motor VRP de Python (`src/`). Expone `/health`, `/optimize`, `/baseline`, `/compare`, `/optimize-csv`. | `uvicorn app.main:app --port 8000` | Cuando el chatbot llama al tool `optimize_with_ortools` o el usuario sube un CSV desde `/import`. |
 | **Motor Python (`src/`)** | Solver VRP dual: heurística propia (K-Means + VMC) + Google OR-Tools (CVRPTW). Procesador de datos, simulador baseline manual y asistente IA con Ollama. | Llamado por el FastAPI internamente | Cuando se pide optimización industrial con time windows y capacidades. |
 | **Ollama local** | LLM `llama3.2:3b` con tool calling (configurable vía `OLLAMA_MODEL`). Mismo modelo para el chatbot del frontend y para los informes explicativos del motor Python. | `ollama serve` (puerto 11434) | Continuamente mientras el chatbot está en uso. |
 
@@ -179,6 +179,7 @@ Los endpoints disponibles:
 - `POST /optimize` — devuelve el plan optimizado.
 - `POST /baseline` — devuelve el plan manual de referencia.
 - `POST /compare` — devuelve ambos + cuadro de ahorros (el que usa el chatbot).
+- `POST /optimize-csv` — optimiza uno o varios CSVs sin tocar la DB.
 
 #### Probar el motor sin UI
 
@@ -228,14 +229,17 @@ Abre [http://localhost:3000](http://localhost:3000). Inicia sesión con `admin /
 
 ##  Guión de demo del frontend (5 min)
 
-1. **Login** como `admin/admin123` → tabla con 47 pedidos repartidos por Alicante.
-2. **Crear pedido nuevo** desde el botón → la dirección se geocodifica en vivo contra Nominatim.
-3. Ir a `/chat`:
+1. **Login** como `admin/admin123`.
+2. **Pestaña Pedidos** → tabla con 47 pedidos repartidos por Alicante (35 del día + 12 históricos).
+3. **Pestaña Rutas** → ya hay 2 rutas pre-asignadas (`RT-YYYY-MM-DD-A` para Juan, `RT-YYYY-MM-DD-B` para María). El seed las crea con el optimizador real, así que la demo arranca con el mapa poblado sin tocar el chat.
+4. **Click en una ruta** → mapa Leaflet con polyline real por calles (OSRM) + marcadores numerados + panel lateral con paradas en orden óptimo y ETAs.
+5. **Pestaña Importar** → arrastra un CSV propio de la pyme (ej. el de `data/pedidos_ejemplo.csv` u otro). Selecciona motor OR-Tools y Zona "Sin restricción" si no es Alicante/Elche. Verás el plan optimizado, los ahorros vs reparto manual y los pedidos diferidos. Pulsa **"Importar al sistema"** y los pedidos aparecen en `/orders`.
+6. **Pestaña Chat**:
    - *"Sugiere rutas para hoy"* → el LLM llama a `current_time`, luego `suggest_routes`, devuelve 3 opciones con resumen (entregas, distancia, duración).
-   - *"Asigna la opción B a Juan"* → el LLM crea la ruta `RT-2026-XX-XX-A` y la asigna.
-4. Ir a `/routes/[id]` → mapa con polyline real por calles + marcadores numerados + panel lateral con paradas en orden óptimo y ETAs.
-5. Volver al chat:
+   - *"Asigna la opción C a Carlos"* → el LLM crea una nueva ruta y la asigna.
    - *"Mi furgo se ha averiado en RT-..., 60 minutos"* → el LLM reoptimiza la ruta restante, mueve los pedidos que ya no caben a mañana (`RESCHEDULED`), registra incidencia, comunica las nuevas ETAs.
+
+> **Sobre la velocidad del chat**: corre 100% local con `llama3.2:3b` en CPU sin GPU. Cada respuesta tarda 15-30 s — es el coste de no enviar datos a la nube. Para demos en hardware modesto, los pasos 1-5 son visuales e instantáneos; el paso 6 luce mejor con paciencia.
 
 ---
 
@@ -297,7 +301,7 @@ OpenRoute se apoya en el ecosistema open source. Devolvemos visibilidad a los pr
 - **[OSRM](https://project-osrm.org/)** (BSD-2) — motor de routing y TSP.
 - **[Nominatim](https://nominatim.org/)** (GPL-2, usado como servicio externo) — geocoding.
 - **[Ollama](https://ollama.com/)** (MIT) — runtime local para LLMs.
-- **[Llama 3.1](https://llama.meta.com/)** (Llama 3.1 Community License) — modelo de lenguaje.
+- **[Llama 3.2](https://llama.meta.com/)** (Llama 3.2 Community License) — modelo de lenguaje.
 - **[Lucide](https://lucide.dev/)** (ISC) — iconos.
 - **[Zod](https://zod.dev/)** (MIT) — validación de inputs.
 
