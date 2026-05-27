@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     orderBy: { fullName: "asc" },
   });
   return NextResponse.json({
-    users: users.map((u) => ({
+    users: users.map((u: (typeof users)[number]) => ({
       id: u.id,
       username: u.username,
       fullName: u.fullName,

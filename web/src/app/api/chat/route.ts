@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid", issues: parsed.error.issues }, { status: 400 });
 
   // Resolve or create session
-  let sessionId = parsed.data.sessionId;
+  let sessionId: string | undefined = parsed.data.sessionId;
   if (sessionId) {
     const exists = await prisma.chatSession.findUnique({ where: { id: sessionId } });
     if (!exists || exists.userId !== session.userId) sessionId = undefined;
@@ -30,16 +30,18 @@ export async function POST(req: NextRequest) {
     });
     sessionId = created.id;
   }
+  // After the block above, sessionId is guaranteed to be a string.
+  const finalSessionId: string = sessionId as string;
 
-  const result = await runChat(sessionId, parsed.data.message, {
-    sessionId,
+  const result = await runChat(finalSessionId, parsed.data.message, {
+    sessionId: finalSessionId,
     userId: session.userId,
     userRole: session.role,
     username: session.username,
   });
 
   return NextResponse.json({
-    sessionId,
+    sessionId: finalSessionId,
     finalText: result.finalText,
     newMessages: result.newMessages,
     uiHints: result.uiHints,
