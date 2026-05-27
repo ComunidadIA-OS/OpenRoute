@@ -80,9 +80,42 @@ Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ##  Guía de Instalación y Uso
 
-OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservicio Python y Ollama.
+OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservicio Python y Ollama. Tienes dos caminos:
 
-> **Atajo (Windows)**: una vez instaladas las dependencias (pasos 2A, 2B, 2C), `.\start.ps1` desde la raíz verifica los prerrequisitos y arranca FastAPI + Next.js automáticamente. Ollama se asume corriendo como servicio. Ahorra abrir 3 terminales.
+- **Opción A — Docker (recomendada)**: un único comando arranca todo. Ideal para que el jurado o una pyme prueben OpenRoute sin instalar nada.
+- **Opción B — Local (desarrollo)**: tres terminales, control total, ideal si quieres iterar el código.
+
+> **Atajo (Windows, opción B)**: una vez instaladas las dependencias (pasos 2A, 2B, 2C), `.\start.ps1` desde la raíz verifica los prerrequisitos y arranca FastAPI + Next.js automáticamente. Ollama se asume corriendo como servicio. Ahorra abrir 3 terminales.
+
+### Opción A — Docker (un solo comando)
+
+Requisitos: **Docker** y **Docker Compose** instalados (incluidos en Docker Desktop).
+
+```bash
+git clone https://github.com/ComunidadIA-OS/OpenRoute.git
+cd OpenRoute
+docker compose up --build
+```
+
+En la primera ejecución, el servicio `ollama-pull` descarga `llama3.1:8b` (~5 GB). El frontend está accesible mientras tanto, pero el chat devolverá error hasta que el modelo termine de bajarse.
+
+Tras el arranque:
+- Frontend: <http://localhost:3000> (login `admin / admin123`).
+- API del motor: <http://localhost:8000/docs>.
+- Ollama: <http://localhost:11434>.
+
+Comandos útiles:
+
+```bash
+docker compose logs -f web         # ver logs del frontend
+docker compose logs -f optimizer   # ver logs del motor VRP
+docker compose down                # parar (mantiene DB y modelos)
+docker compose down -v             # parar y borrar volúmenes (reset total)
+```
+
+Detalles de configuración (bbox propio, OSRM auto-hospedado, etc.) en [`docker-compose.yml`](docker-compose.yml).
+
+### Opción B — Instalación local
 
 ### 1. Clonar el repositorio
 ```bash
