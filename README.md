@@ -191,8 +191,9 @@ Abre [http://localhost:3000](http://localhost:3000). Inicia sesión con `admin /
 Este proyecto se desarrolla para el **Hackathon "IA Responsable y Abierta en Industria" Mayo'26** organizado por la Secretaría de Estado de Digitalización e Inteligencia Artificial ([SEDIA](https://digital.gob.es)) y la Agencia Española de Supervisión de la Inteligencia Artificial (AESIA), en el marco de la [Comunidad IA de Código Abierto](https://digital.gob.es), con la colaboración del EDIH de Aragón ([ITA](https://www.ita.es/) + Universidad de Zaragoza).
 
 - **Reto**: soluciones de IA responsable y abierta aplicables en entornos industriales.
-- **TRL objetivo**: TRL5-6 (validación / demostración de prototipo en entorno relevante).
-- **Compromiso**: el código se publica bajo licencia [Apache 2.0](LICENSE) y está pensado para ser auditable, reproducible y reutilizable por terceros.
+- **TRL objetivo**: TRL5 (validación de componente en entorno relevante).
+- **IA responsable**: la autoevaluación de impacto en derechos humanos (HRIA) realizada con la herramienta del PNUD (<https://hria.eu/#use-cases>) se documenta en [`docs/HRIA.md`](docs/HRIA.md).
+- **Compromiso**: el código se publica bajo licencia [Apache 2.0](LICENSE) y está pensado para ser auditable, reproducible y reutilizable por terceros. La política de divulgación responsable de vulnerabilidades vive en [`SECURITY.md`](SECURITY.md); el historial de cambios en [`CHANGELOG.md`](CHANGELOG.md).
 
 ---
 
