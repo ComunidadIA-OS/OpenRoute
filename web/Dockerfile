@@ -1,13 +1,13 @@
 # Frontend conversacional Next.js de OpenRoute.
 #
 # Build multi-stage:
-#   1. deps   — instala dependencias (cacheado mientras package.json no cambia).
-#   2. builder — genera Prisma Client + build de producción.
+#   1. deps    — instala dependencias (cacheado mientras package.json no cambia).
+#   2. builder — genera Prisma Client + build de producción + SIEMBRA la DB.
 #   3. runner  — imagen ligera que solo lleva el output standalone + Prisma.
 #
-# El binario standalone de Next.js incluye solo lo necesario para servir
-# la app: ~150 MB en lugar de ~1.2 GB con node_modules entero. Crítico
-# para que el jurado pueda descargarse el repo y arrancar todo rápido.
+# La DB se siembra durante el build (no en runtime) para evitar tener que
+# arrastrar tsx/prisma como dependencias del runtime, y para que el primer
+# `docker compose up` arranque al instante con los 47 pedidos demo + usuarios.
 
 # ─── Stage 1: dependencies ──────────────────────────────────
 FROM node:20-alpine AS deps
@@ -38,16 +38,24 @@ RUN npx prisma generate
 # código que tira valores en build time. Los reales se inyectan en
 # tiempo de ejecución desde compose.
 ENV NEXT_TELEMETRY_DISABLED=1 \
-    DATABASE_URL="file:/app/prisma/dev.db" \
+    DATABASE_URL="file:/app/prisma/dev.db.baked" \
     JWT_SECRET="build-time-dummy-rotate-at-runtime" \
     OLLAMA_BASE_URL="http://ollama:11434" \
     OPTIMIZER_BASE_URL="http://optimizer:8000"
 
 RUN npm run build
 
+# Sembrar la DB durante el build: aplicamos migraciones contra dev.db.baked
+# y ejecutamos el seed con los usuarios demo + 47 pedidos. El fichero
+# resultante se copia luego al runner. En runtime, el entrypoint solo lo
+# clona al volumen si no hay DB previa — primer `docker compose up` arranca
+# con admin/admin123 ya disponible, y reinicios posteriores preservan los
+# cambios del operador.
+RUN npx prisma migrate deploy && \
+    npx tsx prisma/seed.ts && \
+    echo "[builder] DB seedeada en /app/prisma/dev.db.baked"
+
 # ─── Stage 3: runner ────────────────────────────────────────
-# Para usar el output standalone, Next.js debe tener
-# `output: 'standalone'` en next.config. Lo configuramos en este commit.
 FROM node:20-alpine AS runner
 WORKDIR /app
 
@@ -69,14 +77,17 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Prisma necesita el schema y el binario del cliente en runtime para que
-# las migraciones y el cliente funcionen.
-COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+# Schema de Prisma (por si el cliente lo necesita en runtime) + cliente
+# generado. Sin migraciones porque la DB ya viene seedeada del builder.
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/schema.prisma ./prisma/schema.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 
-# Entrypoint propio que migra la DB y siembra usuarios demo en el
-# primer arranque. Los siguientes arranques solo hacen `next start`.
+# DB seedeada en build time. El entrypoint la clona al volumen montado
+# en /app/prisma/dev.db si éste está vacío.
+COPY --from=builder --chown=nextjs:nodejs /app/prisma/dev.db.baked /app/dev.db.baked
+
+# Entrypoint trivial: clona la DB baked si el volumen está vacío, exec next.
 COPY --from=builder --chown=nextjs:nodejs /app/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN chmod +x ./docker-entrypoint.sh
 
