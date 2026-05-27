@@ -9,6 +9,7 @@
 // Si hay 2+ CSVs, muestra también un análisis combinado (consolidación).
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import {
   Upload,
   FileText,
@@ -21,6 +22,8 @@ import {
   Info,
   Calendar,
   Route as RouteIcon,
+  Database,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -93,6 +96,21 @@ type DeferredOrder = {
 
 type MatrixSource = "osrm" | "haversine" | "unknown";
 
+// Cada fila del CSV ya validada por el backend Python. Se usa para persistir
+// los pedidos al sistema (POST /api/orders/import) sin re-parsear el CSV.
+type ValidatedRow = {
+  id_pedido: string;
+  cliente: string;
+  direccion?: string;
+  lat: number;
+  lon: number;
+  prioridad?: number;
+  peso_kg: number;
+  franja_inicio: string;
+  franja_fin: string;
+  observaciones?: string;
+};
+
 type IndividualOk = {
   filename: string;
   rows_raw: number;
@@ -105,6 +123,7 @@ type IndividualOk = {
   used_fallback: boolean;
   fallback_reason: string | null;
   pedidos_diferidos: DeferredOrder[];
+  rows_validated?: ValidatedRow[];
 };
 
 type IndividualError = { filename: string; error: string };
@@ -575,6 +594,10 @@ function IndividualCard({
         <SavingsGrid savings={entry.savings} />
         <PlanSummary plan={entry.optimized} />
         <DeferredOrdersList orders={entry.pedidos_diferidos} />
+        <ImportToSystemPanel
+          rows={entry.rows_validated}
+          filename={entry.filename}
+        />
         <details className="text-sm">
           <summary className="cursor-pointer font-medium text-slate-700 dark:text-slate-300 hover:text-[#1a531a]">
             Ver paradas detalladas
@@ -819,6 +842,189 @@ function RouteStops({ route }: { route: PythonRoute }) {
           </li>
         ))}
       </ol>
+    </div>
+  );
+}
+
+// ─── Importar al sistema ──────────────────────────────────────────────
+//
+// Convierte un análisis de CSV (que no toca DB) en un set de pedidos reales
+// dentro del sistema. Una vez importados, aparecen en /orders y el chatbot
+// puede optimizarlos y crear rutas con conductor + furgoneta. Es el puente
+// entre la pantalla de análisis y la operativa diaria.
+
+type ImportResult = {
+  ok: true;
+  date: string;
+  customersCreated: number;
+  customersReused: number;
+  ordersCreated: number;
+  ordersSkippedAsExisting: number;
+  ordersFailed: number;
+  samples: {
+    created: string[];
+    skipped: string[];
+    errors: Array<{ code: string; reason: string }>;
+  };
+};
+
+function todayYmd(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function ImportToSystemPanel({
+  rows,
+  filename,
+}: {
+  rows: ValidatedRow[] | undefined;
+  filename: string;
+}) {
+  const [date, setDate] = useState<string>(todayYmd());
+  const [importing, setImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  // Sin filas validadas (caller no las pasó o backend no las devolvió) no se
+  // puede importar — mostramos un aviso pero no rompemos la pantalla.
+  if (!rows || rows.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 dark:bg-slate-900 p-3 text-xs text-muted-foreground">
+        El backend no devolvió las filas validadas para este CSV; no se puede
+        importar al sistema directamente. Reintenta optimizando de nuevo.
+      </div>
+    );
+  }
+
+  async function handleImport() {
+    setImporting(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch("/api/orders/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orders: rows, date }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data?.error || `Error ${res.status}`);
+        return;
+      }
+      setResult(data as ImportResult);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error desconocido");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  if (result) {
+    return (
+      <div className="rounded-md border border-emerald-300 bg-emerald-50 dark:bg-emerald-950/20 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-emerald-900 dark:text-emerald-200">
+          <CheckCircle2 className="h-5 w-5" />
+          <p className="font-medium">
+            {result.ordersCreated} pedido{result.ordersCreated === 1 ? "" : "s"}{" "}
+            importado{result.ordersCreated === 1 ? "" : "s"} al sistema
+          </p>
+        </div>
+        <div className="text-xs text-emerald-900 dark:text-emerald-300 space-y-0.5">
+          <p>
+            Customers: <strong>{result.customersCreated}</strong> creados,{" "}
+            <strong>{result.customersReused}</strong> ya existían.
+          </p>
+          {result.ordersSkippedAsExisting > 0 && (
+            <p>
+              <strong>{result.ordersSkippedAsExisting}</strong> pedido
+              {result.ordersSkippedAsExisting === 1 ? "" : "s"} omitido
+              {result.ordersSkippedAsExisting === 1 ? "" : "s"} (ya existía en
+              la DB con ese id_pedido).
+            </p>
+          )}
+          {result.ordersFailed > 0 && (
+            <p className="text-amber-800 dark:text-amber-300">
+              <strong>{result.ordersFailed}</strong> pedido
+              {result.ordersFailed === 1 ? "" : "s"} con error — revisa el log
+              del servidor.
+            </p>
+          )}
+          <p>Ventanas horarias ancladas al día {result.date}.</p>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Link
+            href="/orders"
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-200 px-3 py-1.5 text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-950/40"
+          >
+            Ver en Pedidos <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+          <Link
+            href="/chat"
+            className="inline-flex items-center gap-1.5 rounded-md border border-emerald-700 bg-white dark:bg-slate-900 text-emerald-800 dark:text-emerald-200 px-3 py-1.5 text-sm font-medium hover:bg-emerald-100 dark:hover:bg-emerald-950/40"
+          >
+            Pedir al chat: &ldquo;optimiza el día con OR-Tools&rdquo;{" "}
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-[#1a531a]/30 bg-[#1a531a]/5 p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <Database className="h-5 w-5 text-[#1a531a] mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            Importar al sistema
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Persiste los <strong>{rows.length}</strong> pedido
+            {rows.length === 1 ? "" : "s"} validado
+            {rows.length === 1 ? "" : "s"} de{" "}
+            <span className="font-mono">{filename}</span> en la base de datos
+            del sistema. Aparecerán en <code>/orders</code> y el chatbot podrá
+            optimizarlos y asignarlos a conductores.
+          </p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+            Día de las ventanas horarias
+          </label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            disabled={importing}
+            className="rounded-md border bg-white dark:bg-slate-900 px-2 py-1.5 text-sm"
+          />
+        </div>
+        <Button
+          onClick={handleImport}
+          disabled={importing}
+          className="bg-[#1a531a] hover:bg-[#0f3a0f] text-white"
+        >
+          {importing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Importando...
+            </>
+          ) : (
+            <>Importar {rows.length} al sistema</>
+          )}
+        </Button>
+      </div>
+      {error && (
+        <div className="rounded-md border border-red-300 bg-red-50 dark:bg-red-950/20 p-3 text-sm text-red-900 dark:text-red-200 flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
     </div>
   );
 }
