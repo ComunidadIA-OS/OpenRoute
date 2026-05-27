@@ -20,11 +20,55 @@ class DataProcessor:
     El fallback Haversine se conserva como red de seguridad: tests offline, CI
     sin red, jurado evaluando en una sala sin Wi-Fi, OSRM público caído.
     """
-    def __init__(self, earth_radius_km=6371.0, traffic_delay_factor=1.3, speed_kmh=35.0):
+    # Bounding box por defecto: Alicante/Elche, donde se desarrolló el MVP y vive
+    # el dataset de demostración. Se conserva por compatibilidad histórica; una
+    # pyme de otra zona puede ampliar el bbox sin tocar código.
+    DEFAULT_BBOX = (37.5, 39.5, -1.5, 0.5)  # (lat_min, lat_max, lon_min, lon_max)
+    # Equivalente a "sin restricción" — útil para CSVs internacionales o para
+    # validar sin filtrar nada (delega la confianza al usuario que sube el CSV).
+    WORLDWIDE_BBOX = (-90.0, 90.0, -180.0, 180.0)
+
+    def __init__(self, earth_radius_km=6371.0, traffic_delay_factor=1.3, speed_kmh=35.0, bbox=None):
         self.earth_radius_km = earth_radius_km
         self.traffic_delay_factor = traffic_delay_factor # Factor multiplicador de distancia real urbana (callejero vs línea recta)
         self.speed_kmh = speed_kmh # Velocidad promedio de reparto en ciudad (km/h)
         self.average_service_time_min = 10.0 # Tiempo fijo estimado por entrega en paradas (minutos)
+        # Resolución del bbox: argumento explícito > env var > default Alicante/Elche.
+        # El env var es muy útil en despliegues: un docker-compose para una pyme
+        # de Sevilla solo necesita OPENROUTE_BBOX=37.0,38.0,-6.5,-5.5 y todo el
+        # resto del sistema sigue funcionando sin un cambio de código.
+        self.bbox = bbox if bbox is not None else self._resolve_bbox_from_env()
+
+    @classmethod
+    def _resolve_bbox_from_env(cls):
+        """Lee OPENROUTE_BBOX si está definido; si no, usa DEFAULT_BBOX.
+
+        Formatos aceptados:
+          - "lat_min,lat_max,lon_min,lon_max"  → tupla literal.
+          - "worldwide"                         → sin restricción.
+
+        Si el formato es inválido, lanza ValueError con un mensaje claro: mejor
+        fallar pronto que silenciosamente ignorar la configuración del operador.
+        """
+        raw = os.getenv("OPENROUTE_BBOX", "").strip()
+        if not raw:
+            return cls.DEFAULT_BBOX
+        if raw.lower() == "worldwide":
+            return cls.WORLDWIDE_BBOX
+        parts = [p.strip() for p in raw.split(",")]
+        if len(parts) != 4:
+            raise ValueError(
+                f"OPENROUTE_BBOX inválido: {raw!r}. Esperado 'lat_min,lat_max,lon_min,lon_max' o 'worldwide'."
+            )
+        try:
+            lat_min, lat_max, lon_min, lon_max = (float(p) for p in parts)
+        except ValueError as e:
+            raise ValueError(f"OPENROUTE_BBOX inválido: {raw!r} ({e})") from e
+        if lat_min >= lat_max or lon_min >= lon_max:
+            raise ValueError(
+                f"OPENROUTE_BBOX inválido: {raw!r}. Cada min debe ser menor que su max."
+            )
+        return (lat_min, lat_max, lon_min, lon_max)
 
     def load_orders(self, file_path):
         """
@@ -49,9 +93,12 @@ class DataProcessor:
         df = df.dropna(subset=['id_pedido', 'lat', 'lon', 'peso_kg'])
         df['prioridad'] = df['prioridad'].fillna(1).astype(int)
         df['peso_kg'] = df['peso_kg'].astype(float)
-        
-        # Validar rangos de coordenadas
-        df = df[(df['lat'].between(37.5, 39.5)) & (df['lon'].between(-1.5, 0.5))]
+
+        # Validar rangos de coordenadas contra el bbox configurado.
+        # Pedidos fuera del bbox se descartan silenciosamente; la cuenta de
+        # descartados queda visible para el caller (len antes vs len después).
+        lat_min, lat_max, lon_min, lon_max = self.bbox
+        df = df[(df['lat'].between(lat_min, lat_max)) & (df['lon'].between(lon_min, lon_max))]
         
         # Convertir franjas horarias a minutos desde medianoche
         df['minutos_inicio'] = df['franja_inicio'].apply(self._time_to_minutes)
