@@ -278,3 +278,11 @@ desktop.ini
 .claude/
 CLAUDE.md
 data/DATASET_SCHEMA.md
+
+# Datasets reales / operativos (NO subir datos de clientes)
+# El dataset sintético `pedidos_ejemplo.csv` sí se versiona (no es PII).
+data/pedidos_empresa*.csv
+data/pedidos_real*.csv
+data/pedidos_*_anonimizado.csv
+data/raw/
+
