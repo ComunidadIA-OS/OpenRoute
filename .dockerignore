@@ -1,0 +1,37 @@
+# Cosas que NO deben entrar en la imagen del optimizador Python.
+# Mantiene el build context pequeño (segundos vs minutos) y evita
+# filtrar secretos por accidente al contenedor.
+
+# Caches y entornos virtuales locales
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Git, IDE, OS
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+.DS_Store
+
+# El frontend tiene su propio Dockerfile; no debe entrar en el del backend.
+web/
+
+# Skills y documentación no se usan en runtime.
+skills/
+docs/
+
+# Datasets operativos del cliente — el dataset de ejemplo (data/) SÍ entra,
+# pero cualquier .csv suelto fuera de data/ es del operador y no debe
+# acabar en una imagen pública.
+*.csv
+!data/*.csv
+
+# Outputs locales
+*.log
+.env
+.env.*
+!.env.example
