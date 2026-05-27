@@ -40,10 +40,14 @@ def run_test():
     heuristic_opt = RouteOptimizerFactory.get_optimizer("heuristic")
     heuristic_res = heuristic_opt.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
     
-    # 5. Ejecutar OR-Tools
-    print("[+] Ejecutando optimizador: Google OR-Tools...")
-    ortools_opt = RouteOptimizerFactory.get_optimizer("ortools")
+    # 5. Ejecutar OR-Tools con 30s de búsqueda (vs 10s del API por defecto):
+    # el e2e prioriza calidad sobre latencia para validar el solver.
+    print("[+] Ejecutando optimizador: Google OR-Tools (30s)...")
+    from optimizer import ORToolsRouteOptimizer
+    ortools_opt = ORToolsRouteOptimizer(time_limit_seconds=30)
     ortools_res = ortools_opt.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
+    if ortools_res.get("used_fallback"):
+        print(f"   [!] OR-Tools usó fallback ({ortools_res.get('fallback_reason')}). El resultado mostrado es heurístico.")
     
     # 6. Comparaciones
     print("\n" + "=" * 60)
