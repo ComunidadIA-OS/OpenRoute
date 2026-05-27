@@ -91,7 +91,7 @@ export function ChatWindow() {
             <Bot className="h-5 w-5 text-[#1a531a]" /> OpenRoute Assistant
           </h1>
           <p className="text-xs text-muted-foreground">
-            Centro de comandos · llama3.1:8b · tool calling local
+            Centro de comandos · LLM local con tool calling
           </p>
         </div>
         {lastRouteCode && (

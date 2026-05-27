@@ -95,7 +95,10 @@ USER nextjs
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget --quiet --spider http://localhost:3000/api/auth/me || exit 1
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD wget --quiet -O- http://localhost:3000/login >/dev/null 2>&1 || exit 1
+# /login responde 200 sin sesión (la app está sana). El healthcheck previo
+# pegaba a /api/auth/me que devuelve 401 cuando no hay cookie → wget --spider
+# lo marcaba como fallo aunque la app estaba perfectamente arriba.
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
