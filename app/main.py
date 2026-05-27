@@ -370,6 +370,28 @@ def _process_single_csv(
     optimized_plan = optimizer.optimize(orders_df, vehicles_df, dist_matrix, time_matrix)
     savings = metrics.compare_plans(baseline_plan, optimized_plan)
 
+    # Devolvemos las filas validadas para que el frontend pueda persistirlas
+    # al sistema sin re-parsear el CSV. Solo las columnas que el endpoint
+    # /api/orders/import necesita; el resto (minutos_inicio, etc.) las recalcula
+    # el caller a partir de franja_inicio/fin.
+    persistable_cols = [
+        c
+        for c in (
+            "id_pedido",
+            "cliente",
+            "direccion",
+            "lat",
+            "lon",
+            "prioridad",
+            "peso_kg",
+            "franja_inicio",
+            "franja_fin",
+            "observaciones",
+        )
+        if c in orders_df.columns
+    ]
+    rows_validated = orders_df[persistable_cols].to_dict(orient="records")
+
     return {
         "rows_raw": rows_raw,
         "rows_loaded": rows_loaded,
@@ -381,6 +403,9 @@ def _process_single_csv(
         "used_fallback": bool(optimized_plan.get("used_fallback", False)),
         "fallback_reason": optimized_plan.get("fallback_reason"),
         "pedidos_diferidos": optimized_plan.get("pedidos_diferidos", []),
+        # Filas listas para enviar a /api/orders/import del frontend si el
+        # usuario quiere persistir el CSV en la base de datos del sistema.
+        "rows_validated": rows_validated,
     }
 
 
