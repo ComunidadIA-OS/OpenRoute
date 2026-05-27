@@ -51,9 +51,11 @@ class OrderIn(BaseModel):
 
     id_pedido: str = Field(..., description="Código único del pedido")
     cliente: str
-    lat: float = Field(..., ge=37.5, le=39.5, description="Latitud (Alicante/Elche)")
+    lat: float = Field(..., ge=37.5, le=39.5, description="Latitud (Alicante/Elche). Editar rango en data_processor.py para otras zonas.")
     lon: float = Field(..., ge=-1.5, le=0.5, description="Longitud (Alicante/Elche)")
-    prioridad: int = Field(1, ge=1, le=3, description="1=alta, 2=media, 3=baja")
+    # Convención fijada en src/optimizer.py:162 y src/metrics.py: 3=alta, 2=media, 1=baja.
+    # NO invertirlo aquí: si el CSV de la pyme usa 1=urgente, debe convertirse al cargar.
+    prioridad: int = Field(2, ge=1, le=3, description="3=alta urgencia, 2=media, 1=baja")
     peso_kg: float = Field(..., gt=0)
     franja_inicio: str = Field(..., description="HH:MM")
     franja_fin: str = Field(..., description="HH:MM")
@@ -86,16 +88,18 @@ class OptimizeRequest(BaseModel):
 app = FastAPI(
     title="OpenRoute Optimizer API",
     description="Microservicio FastAPI sobre el solver VRP del backend Python.",
-    version="0.1.0",
+    version="0.2.0",
 )
 
-# CORS abierto en dev para que el frontend Next.js pueda llamar desde el browser.
-# En producción, restringir al origin del frontend.
+# CORS configurable por entorno. En dev se permite '*' por defecto; en producción
+# DEBE establecerse OPENROUTE_CORS_ORIGINS al origin del frontend (coma-separado).
+_cors_env = os.getenv("OPENROUTE_CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_env.split(",")] if _cors_env != "*" else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_cors_origins,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 
@@ -224,8 +228,13 @@ def compare(req: OptimizeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en compare: {e}")
 
+    # used_fallback en el top-level del response permite que el cliente lo lea
+    # sin tener que mirar dentro de "optimized" — útil para el chatbot/UI que
+    # debe advertir cuando el resultado NO viene del solver industrial.
     return _serialize_plan({
         "baseline": baseline_plan,
         "optimized": optimized_plan,
         "savings": savings,
+        "used_fallback": bool(optimized_plan.get("used_fallback", False)),
+        "fallback_reason": optimized_plan.get("fallback_reason"),
     })
