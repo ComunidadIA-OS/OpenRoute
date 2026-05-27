@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { ALICANTE_ADDRESSES, CUSTOMER_NAMES, DEPOT } from "./seed-data";
+import { suggestRoutes } from "../src/lib/optimize";
 
 const prisma = new PrismaClient();
 
@@ -151,6 +152,88 @@ async function main() {
   console.log(
     `Created: 5 users, 3 vehicles, ${customers.length} customers, ${todayCount + 12} orders.`,
   );
+
+  // ─── Rutas de demo pre-asignadas ─────────────────────────────────────
+  //
+  // Para que el jurado vea inmediatamente /routes con datos y el mapa
+  // pintado, asignamos por defecto las opciones A y B sugeridas por el
+  // optimizador a Juan y María. Esto NO bloquea la demo si el chatbot
+  // tarda o falla — el jurado puede entrar directamente a /routes/<id>
+  // y ver el polyline OSRM por calles reales.
+  //
+  // Si OSRM público no responde durante el build, capturamos el error y
+  // seguimos sin rutas (mejor demo sin rutas que build roto).
+  try {
+    console.log("Sugiriendo rutas optimizadas para hoy con OSRM...");
+    const options = await suggestRoutes(today, 10);
+
+    if (options.length === 0) {
+      console.log(
+        "[seed] suggestRoutes no devolvió opciones (¿OSRM caído o pedidos sin coords?). Demo arranca sin rutas asignadas.",
+      );
+    } else {
+      const assignments: Array<{
+        option: (typeof options)[number];
+        driver: typeof juan;
+        letter: string;
+      }> = [];
+      if (options[0]) assignments.push({ option: options[0], driver: juan, letter: "A" });
+      if (options[1]) assignments.push({ option: options[1], driver: maria, letter: "B" });
+
+      const dateStr = today.toISOString().slice(0, 10);
+      for (const { option, driver, letter } of assignments) {
+        if (!driver.vehicleId) continue;
+        const code = `RT-${dateStr}-${letter}`;
+        await prisma.route.create({
+          data: {
+            code,
+            date: today,
+            driverId: driver.id,
+            vehicleId: driver.vehicleId,
+            status: "PLANNED",
+            startDepotLat: DEPOT.lat,
+            startDepotLng: DEPOT.lng,
+            totalDistance: option.totalDistance,
+            totalDuration: option.totalDuration,
+            polyline: option.polyline,
+            stops: {
+              create: option.stops.map((s) => ({
+                orderId: s.orderId,
+                sequence: s.sequence,
+                etaPlanned: s.etaPlanned,
+              })),
+            },
+          },
+        });
+        // Los pedidos asignados pasan a DISPATCHED, la furgoneta queda no
+        // disponible (modela una jornada con dos rutas ya planificadas).
+        await prisma.$transaction([
+          ...option.stops.map((s) =>
+            prisma.order.update({
+              where: { id: s.orderId },
+              data: { status: "DISPATCHED", plannedArrival: s.etaPlanned },
+            }),
+          ),
+          prisma.vehicle.update({
+            where: { id: driver.vehicleId },
+            data: { available: false },
+          }),
+        ]);
+        console.log(
+          `  ✓ ${code} → ${driver.username} (${option.stopCount} paradas, ${(option.totalDistance / 1000).toFixed(1)} km)`,
+        );
+      }
+    }
+  } catch (e) {
+    console.warn(
+      "[seed] No se pudieron sembrar rutas (probablemente OSRM no responde):",
+      e instanceof Error ? e.message : e,
+    );
+    console.warn(
+      "[seed] La demo arrancará sin rutas; créalas desde /chat con 'sugiere rutas para hoy'.",
+    );
+  }
+
   console.log("Logins:");
   console.log("  admin    / admin123");
   console.log("  despacho / despacho123");
