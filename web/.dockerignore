@@ -1,0 +1,29 @@
+# Build context del frontend Next.js. node_modules es lo más grande:
+# excluirlo reduce la transferencia al daemon de Docker de ~500 MB a ~5 MB.
+
+node_modules/
+.next/
+out/
+dist/
+build/
+
+# Git, IDE, OS
+.git/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Tests y reports
+coverage/
+*.log
+
+# DB local del operador — el contenedor crea la suya en el primer arranque.
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+
+# Secretos del operador
+.env
+.env.*
+!.env.example
