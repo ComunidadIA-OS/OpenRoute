@@ -184,7 +184,11 @@ class MetricsEngine:
                 'tiempo_viaje_min': route_time_travel,
                 'coste_euros': cost,
                 'co2_emissions_kg': co2_emissions_kg,
-                'sobrecargado': is_overloaded,
+                # bool() obligatorio: la comparación de dos pandas/numpy floats
+                # devuelve numpy.bool_, y FastAPI jsonable_encoder lo intenta
+                # tratar como dict iterable → "'numpy.bool' object is not iterable"
+                # y 500 sin cuerpo. El optimizer.py ya lo hace; aquí faltaba.
+                'sobrecargado': bool(is_overloaded),
                 'carga_total_kg': current_load,
                 'detalle_paradas': stop_details,
             })
