@@ -8,12 +8,12 @@ Este proyecto sigue el [Contributor Covenant](CODE_OF_CONDUCT.md). Al participar
 
 ## Estructura del proyecto
 
-OpenRoute tiene **dos componentes complementarios**:
+OpenRoute tiene **dos componentes complementarios e integrados por HTTP**:
 
-- **Backend de optimización (raíz del repo)** — Python + Streamlit + Google OR-Tools. Resuelve el VRP con restricciones de tiempo y capacidad, genera explicaciones XAI sobre las decisiones de ruta.
-- **Frontend conversacional (`web/`)** — Next.js 14 + Ollama (LLM local) + Leaflet. Un chatbot en español que actúa como centro de comandos: consulta pedidos, sugiere rutas optimizadas, asigna furgonetas y reorganiza ante averías.
+- **Microservicio de optimización (raíz del repo)** — Python + FastAPI + Google OR-Tools. Resuelve el VRP con restricciones de tiempo y capacidad, genera explicaciones XAI sobre las decisiones de ruta. Se levanta con `uvicorn app.main:app --port 8000` y expone `/health`, `/optimize`, `/baseline`, `/compare`, `/optimize-csv`.
+- **Frontend conversacional (`web/`)** — Next.js 14 + Ollama (LLM local) + Leaflet. Un chatbot en español que actúa como centro de comandos: consulta pedidos, sugiere rutas optimizadas, asigna furgonetas y reorganiza ante averías. Delega al microservicio Python a través del tool `optimize_with_ortools` cuando el caso lo requiere.
 
-Ambos componentes pueden ejecutarse de forma independiente o integrarse (el frontend puede llamar al optimizador Python como microservicio para casos VRP con time windows estrictas).
+Ambos componentes pueden ejecutarse de forma independiente (el motor sirve a cualquier cliente HTTP; el frontend funciona con OSRM TSP si el microservicio no está) o juntos con `docker compose up --build`.
 
 Detalle técnico: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -43,8 +43,9 @@ Etiquetas útiles:
 1. Haz fork del repositorio.
 2. Crea una rama descriptiva: `git checkout -b feat/mi-mejora` o `fix/bug-xyz`.
 3. Asegúrate de que los componentes que tocas siguen funcionando:
-   - **Backend Python**: `pytest` (cuando los tests estén disponibles), `python optimizar_rutas.py` ejecuta sin errores.
-   - **Frontend web**: `cd web && npm run lint && npm run build`.
+   - **Motor Python**: `OPENROUTE_DISABLE_OSRM=1 python -m unittest src/test_optimizer.py` (24 tests, ~40s, sin red).
+   - **Frontend web**: `cd web && npm run lint && npx tsc --noEmit && npm run build`.
+   - **Integración Docker**: `docker compose up --build -d` y comprobar que `docker compose ps` muestra los 3 servicios como `(healthy)`.
 4. Haz commits pequeños y descriptivos siguiendo [Conventional Commits](https://www.conventionalcommits.org/):
    - `feat(web): añadir tool de listado de incidencias al chatbot`
    - `fix(optimizer): corregir capacidad por vehículo en restricción VRP`
@@ -78,27 +79,28 @@ Etiquetas útiles:
 
 ### Áreas donde nos vendría bien ayuda
 
-- 🧪 **Tests**: cobertura para `optimizar_rutas.py` y para el `lib/chat/` del frontend.
-- 🐳 **Docker**: un `docker-compose.yml` que levante backend Python + frontend Next.js + Ollama + OSRM self-hosted.
-- 🔗 **Integración backend↔frontend**: añadir un tool al chatbot que llame al optimizador Python para casos con muchas paradas o restricciones complejas.
-- 🌍 **Internacionalización**: extraer strings a un sistema i18n.
-- ♿ **Accesibilidad**: auditoría WCAG de los componentes principales.
-- 🔐 **Auth de producción**: integración con OAuth (Google, Microsoft) además del JWT local.
+- 🧪 **Tests del frontend**: Vitest para `web/src/lib/`, Playwright para los flujos críticos (login → chat → asignar ruta → marcar entregada). El motor Python ya tiene 24 tests en `src/test_optimizer.py`.
+- 🐳 **Imágenes Docker publicadas**: hoy `docker-compose.yml` construye localmente. Publicar `openroute/optimizer` y `openroute/web` en GHCR ahorraría 5-10 min al jurado.
+- 🌍 **Internacionalización**: extraer strings de UI y system prompt a un sistema i18n.
+- ♿ **Accesibilidad**: auditoría WCAG 2.2 AA de los componentes principales.
+- 🔐 **Auth de producción**: integración con OAuth (Google, Microsoft) además del JWT local; rate limiting en `/api/auth/login`.
 - 📊 **Ficha técnica del conductor**: KPIs históricos (rutas, tiempos, tasa de entrega).
+- 🗄️ **Campo `priority` en Prisma `Order`**: hoy todos los pedidos llegan al solver con prioridad 2 (TODO marcado en `web/src/lib/python-optimizer.ts`). Es la pieza que activa la heurística de prioridad del motor desde el frontend.
 
 ## Setup de desarrollo
 
-Ver [README.md](README.md) para los pasos de instalación de cada componente.
-
-Resumen rápido:
+Ver [README.md](README.md) para los pasos de instalación de cada componente. Resumen rápido para desarrollo local (la opción Docker está documentada en el README como recomendada para evaluación):
 
 ```bash
-# Backend Python (Streamlit + OR-Tools)
+# Motor Python (FastAPI + OR-Tools) — terminal 1
+python -m venv .venv
+source .venv/bin/activate            # macOS / Linux
+.venv\Scripts\activate               # Windows PowerShell
 pip install -r requirements.txt
-streamlit run app/main.py
+uvicorn app.main:app --reload --port 8000
 
-# Frontend Next.js + Ollama (en otra terminal)
-ollama pull llama3.1:8b
+# Frontend Next.js + Ollama — terminal 2
+ollama pull llama3.2:1b              # modelo activo por defecto
 cd web
 cp .env.example .env
 npm install
