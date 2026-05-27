@@ -1,14 +1,14 @@
 # Arquitectura de OpenRoute
 
-OpenRoute combina **dos componentes complementarios** para ofrecer una solución de optimización logística accesible para PYMEs:
+OpenRoute combina **dos componentes complementarios e integrados por HTTP** para ofrecer una solución de optimización logística accesible para PYMEs:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                BACKEND DE OPTIMIZACIÓN (raíz)                │
-│  Streamlit (UI gestor) · pandas (datos) · OR-Tools (VRP)     │
-│  CSV in → rutas con restricciones → explicaciones XAI        │
+│            MICROSERVICIO DE OPTIMIZACIÓN (raíz)              │
+│  FastAPI (:8000) · pandas · OR-Tools (CVRPTW) · OSRM /table  │
+│  CSV/JSON in → rutas con restricciones → métricas + XAI      │
 └──────────────────────────────────────────────────────────────┘
-                              ↕ (integración futura HTTP)
+                              ↕ HTTP (/compare, /optimize-csv)
 ┌──────────────────────────────────────────────────────────────┐
 │              FRONTEND CONVERSACIONAL (web/)                  │
 │  Next.js 14 · Prisma+SQLite · Leaflet · OSRM · Ollama LLM    │
@@ -16,30 +16,30 @@ OpenRoute combina **dos componentes complementarios** para ofrecer una solución
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Ambos componentes pueden ejecutarse de forma **independiente** (cada uno aporta valor por separado) o **integrados** (el frontend delega VRP complejos al optimizador Python).
+Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python aporta valor sólo con CSV + curl) o **integrados** (el chatbot del frontend delega VRP complejos vía el tool `optimize_with_ortools`, y la pantalla `/import` permite subir CSVs sin tocar la DB del frontend).
 
 ---
 
-## Componente 1: Backend de optimización (Python)
+## Componente 1: Microservicio de optimización (Python)
 
-**Carpeta**: raíz del repo (`app/`, `data/`, `optimizar_rutas.py`, scripts en `skills/`).
+**Carpeta**: raíz del repo (`app/main.py` para FastAPI, `src/` para la lógica, `data/` con dataset de ejemplo).
 
 **Stack**:
-- **Streamlit** — UI del gestor de flota: carga CSV, visualiza métricas, exporta rutas.
-- **pandas** — limpieza y validación de los pedidos de entrada.
-- **Google OR-Tools** — solver de VRP con time windows y restricciones de capacidad.
-- **Folium / Pydeck** — render del mapa con la solución.
-- **LLM open source** — generación de explicaciones en lenguaje natural sobre las decisiones del solver (XAI).
+- **FastAPI + uvicorn** — microservicio HTTP en `:8000` con endpoints `/health`, `/optimize`, `/baseline`, `/compare` y `/optimize-csv`.
+- **pandas / NumPy** — limpieza y validación de pedidos, construcción de matrices.
+- **Google OR-Tools** — solver CVRPTW con time windows, capacidades, prioridades y DISJUNCTIONS para diferir pedidos infactibles.
+- **OSRM `/table`** — matriz real de distancias por callejero; fallback automático a Haversine × factor urbano si OSRM no responde (cliente en `src/osrm_client.py`).
+- **Ollama** — generación de informes XAI en lenguaje natural (`src/ai_assistant.py`); mismo modelo y endpoint que usa el chatbot del frontend.
 
 **Flujo**:
-1. El usuario carga un CSV con pedidos.
-2. `data_processor.py` valida y construye matrices de distancia.
-3. `optimizer.py` resuelve el VRP con OR-Tools.
-4. `metrics.py` compara contra una ruta baseline manual.
-5. `ai_assistant.py` explica por qué el solver agrupó ciertas paradas.
-6. Streamlit (`app/main.py`) renderiza dashboard + mapa.
+1. El cliente (frontend Next.js o `curl`) envía pedidos + vehículos al endpoint que corresponda.
+2. `data_processor.py` valida, recorta por bbox configurable y construye matrices OSRM/Haversine.
+3. `optimizer.py` resuelve el VRP con OR-Tools (o cae a heurística marcando `used_fallback=true`).
+4. `metrics.py` simula un baseline manual realista (zona + urgencia de ventana) y devuelve el cuadro de ahorros.
+5. `ai_assistant.py` opcionalmente explica por qué el solver agrupó ciertas paradas.
+6. El response sale como JSON con plan + baseline + ahorros + pedidos diferidos.
 
-**Fortalezas**: VRP serio con restricciones reales (capacidad, time windows, prioridades), explicaciones XAI, formato Excel/CSV familiar para PYMEs.
+**Fortalezas**: VRP serio con restricciones reales, matriz real por calles, baseline humano honesto (no caricaturizado), pedidos infactibles reportados explícitamente, todo cubierto por 22 tests en `src/test_optimizer.py`.
 
 ---
 
@@ -88,7 +88,7 @@ Ambos componentes pueden ejecutarse de forma **independiente** (cada uno aporta 
 
 ### Decisiones de diseño
 
-**Next.js 14 App Router + un solo workspace**: la idea original incluía un backend Python separado con FastAPI + OR-Tools, pero por restricción de tiempo del hackathon se descartó. Toda la lógica de `web/` vive en Next.js. La integración con el backend Python existente queda como evolución natural (ver roadmap).
+**Next.js 14 App Router + microservicio Python en paralelo**: la lógica conversacional, persistencia y mapa viven en `web/`; el VRP industrial vive en `app/` + `src/`. Se hablan por HTTP, lo que mantiene cada componente desplegable y auditable por separado. El tool `optimize_with_ortools` del chatbot y la pantalla `/import` son los dos puntos de integración hoy.
 
 **SQLite + Prisma 6**: cero configuración para demo. La migración a PostgreSQL es solo un cambio de `DATABASE_URL` (Prisma soporta ambos).
 
@@ -187,7 +187,7 @@ web/
 
 ### Sistema de tool calling del chatbot
 
-13 tools definidos en `lib/chat/tools.ts`:
+15 tools definidos en `lib/chat/tools.ts`:
 
 | Tool | Propósito |
 |---|---|
@@ -197,10 +197,11 @@ web/
 | `list_vehicles`, `list_drivers` | Inventario. |
 | `suggest_routes` | Llama a `optimize.suggestRoutes()` → devuelve 3 opciones (Centro, Playa, Completa). |
 | `assign_route` | Persiste una opción como Route real, asigna conductor + furgoneta. |
+| `optimize_with_ortools` | ⭐ Delega al microservicio FastAPI para resolver CVRPTW con OR-Tools. Devuelve plan + baseline + ahorros + pedidos diferidos. |
 | `list_routes`, `get_route` | Lectura. |
 | `mark_stop_delivered` | Actualiza estado de parada. |
 | `report_incident` | Registra incidencia. |
-| `reschedule_route` | ⭐ La estrella. Re-optimiza tras avería. |
+| `reschedule_route` | Re-optimiza tras avería. |
 
 ### Seguridad (nivel demo, no producción)
 
@@ -213,26 +214,25 @@ web/
 
 ---
 
-## Integración Python ↔ web/ (roadmap)
+## Integración Python ↔ web/ (estado actual)
 
-Hoy ambos componentes funcionan de forma independiente. La evolución natural es:
+Ya está implementada y operativa:
 
-1. Exponer el optimizador Python como microservicio HTTP (FastAPI).
-2. Añadir un tool al chatbot `optimize_with_or_tools` que delegue al backend Python cuando:
-   - Hay más de ~15 paradas.
-   - Hay time windows estrictas.
-   - Se requieren restricciones de capacidad complejas.
-3. Mostrar las explicaciones XAI del backend en la UI del frontend.
+1. ✅ Optimizador Python expuesto como microservicio HTTP (FastAPI en `app/main.py`, puerto 8000).
+2. ✅ Tool `optimize_with_ortools` añadido al chatbot — delega al backend cuando el usuario pide planificación industrial con time windows o capacidades.
+3. ✅ Pantalla `/import` para que la pyme suba sus propios CSVs sin tocar la DB del frontend (caso de uso TRL5).
+4. ✅ El chatbot avisa explícitamente cuando OR-Tools cae a la heurística (`used_fallback=true`) y lista los `pedidos_diferidos` que las DISJUNCTIONS descartaron por infactibilidad — IA responsable.
 
-Esto permite que la rapidez de OSRM `/trip` cubra el 80% de los casos (PYMEs pequeñas con pocas paradas) y la potencia de OR-Tools cubra el 20% complejo.
+OSRM `/trip` se mantiene como motor TSP rápido para ≤10 paradas; OR-Tools cubre el resto (>10 paradas, time windows estrictas, capacidades reales).
 
 ---
 
 ## Decisiones que no escalan (deuda técnica conocida)
 
 1. **`lastSuggestions` en memoria por sesión** (`web/src/lib/chat/tool-handlers.ts`): el cache de opciones devueltas por `suggest_routes` vive en un `Map` del proceso. Si el servidor se reinicia o hay varios procesos, se pierde. Mover a Redis o a la propia DB.
-2. **OR-Tools no integrado todavía**: para más de ~15 paradas o time windows estrictas, el TSP simple de OSRM es subóptimo. Resuelve el componente Python; pendiente conectar.
-3. **No hay tests automatizados** (ni en backend Python ni en `web/`). El MVP se validó manualmente. Añadir pytest + Vitest + Playwright es la primera tarea del roadmap post-hackathon.
-4. **Sin i18n**: textos hardcodeados en español. Si entra mercado internacional, extraer a `next-intl` o similar.
+2. **Prisma `Order` no tiene campo `priority`**: hoy todos los pedidos llegan al solver con urgencia media (2). El esquema ya soporta time windows y peso; pendiente añadir `priority` y propagarlo (`web/src/lib/python-optimizer.ts` lo marca como TODO).
+3. **OSRM público se queda en ~100 puntos por petición**: matrices más grandes necesitan partición o auto-hospedaje OSRM. El cliente actual (`src/osrm_client.py`) detecta y propaga el error; el fallback Haversine sigue siendo válido.
+4. **Sin tests E2E del frontend**: el backend Python tiene 22 tests unitarios (`src/test_optimizer.py`), pero la UI Next.js solo tiene lint + build en CI. Pendiente añadir Vitest + Playwright.
+5. **Sin i18n**: textos hardcodeados en español. Si entra mercado internacional, extraer a `next-intl` o similar.
 
 Ver más en [ROADMAP.md](ROADMAP.md).
