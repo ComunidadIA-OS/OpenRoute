@@ -278,6 +278,45 @@ def _parse_use_osrm(value: str | None) -> bool | None:
     )
 
 
+def _parse_bbox(value: str | None) -> tuple[float, float, float, float] | None:
+    """Convierte el string del FormData en una tupla de bbox o None.
+
+    Formatos:
+      - None / "" / "default"      → None (el DataProcessor usará su default).
+      - "worldwide"                 → bbox sin restricción geográfica.
+      - "lat_min,lat_max,lon_min,lon_max" → tupla literal.
+
+    Validamos pronto para devolver 400 con un mensaje útil al cliente, en lugar
+    de dejar que el DataProcessor lance ValueError dentro del loop.
+    """
+    if value is None:
+        return None
+    v = value.strip().lower()
+    if v in {"", "default"}:
+        return None
+    if v == "worldwide":
+        return DataProcessor.WORLDWIDE_BBOX
+    parts = [p.strip() for p in value.split(",")]
+    if len(parts) != 4:
+        raise HTTPException(
+            status_code=400,
+            detail=f"bbox inválido: {value!r}. Esperado 'lat_min,lat_max,lon_min,lon_max' o 'worldwide'.",
+        )
+    try:
+        lat_min, lat_max, lon_min, lon_max = (float(p) for p in parts)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"bbox inválido: {value!r}. Cada componente debe ser un número.",
+        )
+    if lat_min >= lat_max or lon_min >= lon_max:
+        raise HTTPException(
+            status_code=400,
+            detail=f"bbox inválido: {value!r}. Cada *_min debe ser menor que su *_max.",
+        )
+    return (lat_min, lat_max, lon_min, lon_max)
+
+
 def _process_single_csv(
     raw_df: pd.DataFrame,
     vehicles_df: pd.DataFrame,
@@ -285,13 +324,14 @@ def _process_single_csv(
     depot_lon: float,
     mode: str,
     use_osrm: bool | None,
+    bbox: tuple[float, float, float, float] | None,
 ) -> dict:
     """Valida un DataFrame de pedidos, lo optimiza y devuelve el bloque de resultados.
 
     Se separa del endpoint para poder reusarse tanto en el procesado individual
     como en el combinado (concat de varios CSVs).
     """
-    processor = DataProcessor()
+    processor = DataProcessor(bbox=bbox)
     rows_raw = len(raw_df)
     try:
         orders_df = processor.validate_orders(raw_df)
@@ -301,12 +341,14 @@ def _process_single_csv(
 
     rows_loaded = len(orders_df)
     if rows_loaded == 0:
+        lat_min, lat_max, lon_min, lon_max = processor.bbox
         raise HTTPException(
             status_code=400,
             detail=(
-                "Ninguna fila pasó la validación. Causas frecuentes: lat/lon fuera "
-                "del rango Alicante/Elche (37.5–39.5, -1.5–0.5) o columnas obligatorias "
-                "nulas. Revisa data_processor.py:43 si tu zona es otra."
+                "Ninguna fila pasó la validación. Causas frecuentes: "
+                f"lat/lon fuera del bbox configurado ({lat_min}..{lat_max}, {lon_min}..{lon_max}) "
+                "o columnas obligatorias nulas. Si tu zona no es Alicante/Elche, "
+                "amplía el bbox vía OPENROUTE_BBOX o pasa bbox=worldwide en la petición."
             ),
         )
 
@@ -343,6 +385,10 @@ async def optimize_csv(
         None,
         description="auto (default) | true (fuerza OSRM /table) | false (Haversine, sin red)",
     ),
+    bbox: str | None = Form(
+        None,
+        description="default | worldwide | 'lat_min,lat_max,lon_min,lon_max'. Restricción de coordenadas válidas.",
+    ),
 ):
     """Optimiza uno o varios CSV de pedidos SIN tocar la base de datos del frontend.
 
@@ -357,13 +403,18 @@ async def optimize_csv(
       use_osrm: "auto" (default) intenta OSRM /table y cae a Haversine si no
                 responde; "true" fuerza matriz OSRM (real por calles); "false"
                 fuerza Haversine (rápido pero aproximado, sin red).
+      bbox:     restricción geográfica. "default" (Alicante/Elche), "worldwide"
+                (sin restricción), o "lat_min,lat_max,lon_min,lon_max" para
+                fijar la propia. También configurable globalmente con la env
+                var OPENROUTE_BBOX.
     """
     if not files:
         raise HTTPException(status_code=400, detail="Hay que subir al menos un CSV")
 
     use_osrm_flag = _parse_use_osrm(use_osrm)
+    bbox_tuple = _parse_bbox(bbox)
 
-    processor = DataProcessor()
+    processor = DataProcessor(bbox=bbox_tuple)
     try:
         vehicles_df = processor.load_vehicles(_default_vehicles_path())
     except Exception as e:
@@ -392,7 +443,7 @@ async def optimize_csv(
 
         try:
             result = _process_single_csv(
-                raw_df, vehicles_df, depot_lat, depot_lon, mode, use_osrm_flag
+                raw_df, vehicles_df, depot_lat, depot_lon, mode, use_osrm_flag, bbox_tuple
             )
         except HTTPException as e:
             individual.append({"filename": filename, "error": e.detail})
@@ -447,6 +498,7 @@ async def optimize_csv(
     return _serialize_plan({
         "mode": mode,
         "use_osrm_requested": use_osrm,
+        "bbox_used": list(processor.bbox),
         "individual": individual,
         "combined": combined,
     })
