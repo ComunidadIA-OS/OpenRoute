@@ -2,13 +2,14 @@
 
 Este documento describe cómo consumir el **motor logístico de OpenRoute**
 (`src/optimizer.py`, `src/data_processor.py`, `src/metrics.py`,
-`src/ai_assistant.py`) desde otra aplicación: panel Streamlit del gestor de
-flota, microservicio FastAPI para el frontend conversacional, o cualquier
-otro componente Python.
+`src/ai_assistant.py`) desde otra aplicación: el microservicio FastAPI
+que sirve al frontend Next.js, scripts CLI internos como
+`src/validate_dataset.py` o `src/test_run.py`, o cualquier otro
+componente Python que necesite resolver un VRP con time windows y
+capacidades reales.
 
-> Diseño y autoría del motor: **Samuel Parra**. Guía dirigida en su origen
-> a **Giulian Peterlecean** (Streamlit) y posteriormente extendida para la
-> integración con el frontend Next.js.
+> Diseño y autoría del motor: **Samuel Parra**. Documentación de
+> integración mantenida por todo el equipo.
 
 ---
 
