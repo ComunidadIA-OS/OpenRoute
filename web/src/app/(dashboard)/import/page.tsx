@@ -251,8 +251,12 @@ export default function ImportPage() {
           <CardDescription>
             CSV con columnas: <code className="text-xs">id_pedido, cliente, lat, lon,
             prioridad, peso_kg, franja_inicio, franja_fin</code> (columna{" "}
-            <code className="text-xs">direccion</code> opcional). Coordenadas dentro del
-            rango Alicante/Elche.
+            <code className="text-xs">direccion</code> opcional).{" "}
+            {bboxMode === "worldwide" ? (
+              <>Cualquier coordenada del mundo es válida (zona <strong>sin restricción</strong>).</>
+            ) : (
+              <>Coordenadas dentro del rango <strong>Alicante/Elche</strong>; cámbialo a <em>Sin restricción</em> abajo si tu zona es otra.</>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
