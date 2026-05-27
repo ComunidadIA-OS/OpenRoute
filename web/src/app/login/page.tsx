@@ -200,9 +200,7 @@ export default function LoginPage() {
           </div>
 
           {/* Footer */}
-          <div className="text-xs text-white/60">
-            Hackathon IA Responsable y Abierta · SEDIA + AESIA · Mayo 2026
-          </div>
+          <div className="text-xs text-white/60">@IlicitIA</div>
         </div>
       </div>
 
