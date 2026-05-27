@@ -28,7 +28,7 @@ type PythonOrderIn = {
   cliente: string;
   lat: number;
   lon: number;
-  prioridad: number; // 1=alta, 2=media, 3=baja
+  prioridad: number; // 3=alta urgencia, 2=media, 1=baja (consistente con motor Python)
   peso_kg: number;
   franja_inicio: string; // HH:MM
   franja_fin: string; // HH:MM
@@ -95,6 +95,11 @@ export type PythonCompareResult = {
   baseline: PythonPlan;
   optimized: PythonPlan;
   savings: PythonComparison;
+  /** True si OR-Tools no encontró solución factible y cayó a la heurística.
+   * El consumidor (chatbot, UI) DEBE comprobarlo y advertir al usuario en lugar
+   * de presentar el resultado como "optimizado por OR-Tools". */
+  used_fallback: boolean;
+  fallback_reason?: string | null;
 };
 
 // ─── Util ────────────────────────────────────────────────────────────
@@ -158,7 +163,11 @@ async function loadOrdersForDate(date: Date): Promise<PythonOrderIn[]> {
     cliente: o.customer.name,
     lat: o.lat!,
     lon: o.lng!,
-    prioridad: 2, // El esquema de la DB no tiene prioridad; usar media por defecto
+    // TODO(TRL5): añadir campo `priority` al modelo Order de Prisma y propagarlo.
+    // Mientras tanto todos los pedidos llegan al solver con urgencia media, lo
+    // que neutraliza el peso de la prioridad en el score. La promesa de
+    // "OR-Tools con prioridades" se ve diluida hasta que el schema se amplíe.
+    prioridad: 2,
     peso_kg: o.weightKg,
     franja_inicio: toHHMM(o.windowStart),
     franja_fin: toHHMM(o.windowEnd),
