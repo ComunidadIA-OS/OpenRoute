@@ -256,12 +256,35 @@ def compare(req: OptimizeRequest):
 # Los IDs de pedido se prefijan en el combinado para evitar colisiones entre
 # CSVs distintos que reusen "PED-001" etc.
 
+def _parse_use_osrm(value: str | None) -> bool | None:
+    """Convierte el string del FormData en el tri-state que espera DataProcessor.
+
+    - "true"/"yes"/"1"  → True (fuerza OSRM, error si no responde)
+    - "false"/"no"/"0"  → False (fuerza Haversine, sin red)
+    - None/"" /"auto"   → None (auto: OSRM si responde, fallback a Haversine)
+    """
+    if value is None:
+        return None
+    v = value.strip().lower()
+    if v in {"", "auto"}:
+        return None
+    if v in {"true", "yes", "1", "on"}:
+        return True
+    if v in {"false", "no", "0", "off"}:
+        return False
+    raise HTTPException(
+        status_code=400,
+        detail=f"Valor inválido para use_osrm: {value!r}. Esperado: auto | true | false.",
+    )
+
+
 def _process_single_csv(
     raw_df: pd.DataFrame,
     vehicles_df: pd.DataFrame,
     depot_lat: float,
     depot_lon: float,
     mode: str,
+    use_osrm: bool | None,
 ) -> dict:
     """Valida un DataFrame de pedidos, lo optimiza y devuelve el bloque de resultados.
 
@@ -287,7 +310,10 @@ def _process_single_csv(
             ),
         )
 
-    dist_matrix, time_matrix = processor.build_distance_matrix(depot_lat, depot_lon, orders_df)
+    dist_matrix, time_matrix = processor.build_distance_matrix(
+        depot_lat, depot_lon, orders_df, use_osrm=use_osrm
+    )
+    matrix_source = getattr(processor, "last_matrix_source", "unknown")
 
     metrics = MetricsEngine()
     baseline_plan = metrics.simulate_manual_baseline(orders_df, vehicles_df, dist_matrix, time_matrix)
@@ -299,6 +325,7 @@ def _process_single_csv(
         "rows_raw": rows_raw,
         "rows_loaded": rows_loaded,
         "rows_discarded": rows_raw - rows_loaded,
+        "matrix_source": matrix_source,
         "baseline": baseline_plan,
         "optimized": optimized_plan,
         "savings": savings,
@@ -312,6 +339,10 @@ def _process_single_csv(
 async def optimize_csv(
     files: list[UploadFile] = File(..., description="Uno o varios CSV de pedidos."),
     mode: Literal["ortools", "heuristic"] = Form("ortools"),
+    use_osrm: str | None = Form(
+        None,
+        description="auto (default) | true (fuerza OSRM /table) | false (Haversine, sin red)",
+    ),
 ):
     """Optimiza uno o varios CSV de pedidos SIN tocar la base de datos del frontend.
 
@@ -321,11 +352,16 @@ async def optimize_csv(
     medir el ahorro de consolidación entre turnos/días/clientes.
 
     Form fields:
-      files: uno o varios CSV con las 8 columnas estándar.
-      mode:  "ortools" (default, industrial) o "heuristic".
+      files:    uno o varios CSV con las 8 columnas estándar.
+      mode:     "ortools" (default, industrial) o "heuristic".
+      use_osrm: "auto" (default) intenta OSRM /table y cae a Haversine si no
+                responde; "true" fuerza matriz OSRM (real por calles); "false"
+                fuerza Haversine (rápido pero aproximado, sin red).
     """
     if not files:
         raise HTTPException(status_code=400, detail="Hay que subir al menos un CSV")
+
+    use_osrm_flag = _parse_use_osrm(use_osrm)
 
     processor = DataProcessor()
     try:
@@ -355,7 +391,9 @@ async def optimize_csv(
             continue
 
         try:
-            result = _process_single_csv(raw_df, vehicles_df, depot_lat, depot_lon, mode)
+            result = _process_single_csv(
+                raw_df, vehicles_df, depot_lat, depot_lon, mode, use_osrm_flag
+            )
         except HTTPException as e:
             individual.append({"filename": filename, "error": e.detail})
             continue
@@ -384,7 +422,10 @@ async def optimize_csv(
             prefixed.append(df2)
         merged = pd.concat(prefixed, ignore_index=True)
 
-        dist_matrix, time_matrix = processor.build_distance_matrix(depot_lat, depot_lon, merged)
+        dist_matrix, time_matrix = processor.build_distance_matrix(
+            depot_lat, depot_lon, merged, use_osrm=use_osrm_flag
+        )
+        combined_matrix_source = getattr(processor, "last_matrix_source", "unknown")
         metrics = MetricsEngine()
         baseline_plan = metrics.simulate_manual_baseline(merged, vehicles_df, dist_matrix, time_matrix)
         optimizer = RouteOptimizerFactory.get_optimizer(mode)
@@ -394,6 +435,7 @@ async def optimize_csv(
         combined = {
             "files": valid_filenames,
             "total_rows": len(merged),
+            "matrix_source": combined_matrix_source,
             "baseline": baseline_plan,
             "optimized": optimized_plan,
             "savings": savings,
@@ -404,6 +446,7 @@ async def optimize_csv(
 
     return _serialize_plan({
         "mode": mode,
+        "use_osrm_requested": use_osrm,
         "individual": individual,
         "combined": combined,
     })
