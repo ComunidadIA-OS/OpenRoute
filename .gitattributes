@@ -1,0 +1,16 @@
+# Force LF (Unix) line endings on files that MUST run inside Linux containers.
+# Sin esto, en Windows git autocrlf=true los convierte a CRLF y los scripts
+# de shell fallan al ejecutarse en Alpine ("bad interpreter: No such file or
+# directory" o el `set -e` rompe en silencio).
+
+# Shell scripts
+*.sh         text eol=lf
+
+# Dockerfiles y compose
+Dockerfile   text eol=lf
+*.Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+docker-compose.*.yml text eol=lf
+
+# .dockerignore (no se ejecuta, pero Docker lo lee y CRLF puede colarse)
+.dockerignore text eol=lf
