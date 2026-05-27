@@ -73,16 +73,20 @@ class TestDataProcessor(unittest.TestCase):
         self.assertTrue(20.0 < dist < 35.0, f"Distancia fuera de rango: {dist} km")
 
     def test_distance_matrix_symmetry_and_diagonal(self):
+        # use_osrm=False fuerza Haversine: simetría garantizada por la fórmula.
+        # OSRM real NO es simétrico (calles de sentido único), así que este
+        # invariante no aplicaría al modo OSRM — por eso lo testeamos con Haversine.
         df = pd.DataFrame([
             _order("P1", 38.2725, -0.6782, 10.0),
             _order("P2", 38.2810, -0.6990, 15.0),
         ])
-        dist, _ = self.processor.build_distance_matrix(38.2743, -0.6865, df)
+        dist, _ = self.processor.build_distance_matrix(38.2743, -0.6865, df, use_osrm=False)
         self.assertEqual(dist.shape, (3, 3))
         for i in range(3):
             self.assertEqual(dist[i, i], 0.0)
         self.assertAlmostEqual(dist[0, 1], dist[1, 0], places=5)
         self.assertAlmostEqual(dist[1, 2], dist[2, 1], places=5)
+        self.assertEqual(self.processor.last_matrix_source, "haversine")
 
 
 class TestOptimizerSchema(unittest.TestCase):
@@ -102,7 +106,10 @@ class TestOptimizerSchema(unittest.TestCase):
         self.processor = DataProcessor()
         self.vehicles = pd.DataFrame([_vehicle()])
         self.orders = pd.DataFrame([_order("P1", 38.2725, -0.6782, 30.0)])
-        self.dist, self.times = self.processor.build_distance_matrix(38.2743, -0.6865, self.orders)
+        # Tests deterministas: Haversine, sin depender de OSRM público.
+        self.dist, self.times = self.processor.build_distance_matrix(
+            38.2743, -0.6865, self.orders, use_osrm=False
+        )
 
     def _assert_schema(self, plan):
         self.assertTrue(self.REQUIRED_TOP_KEYS.issubset(plan.keys()),
@@ -140,7 +147,7 @@ class TestHardConstraints(unittest.TestCase):
             _order("P2", 38.2750, -0.6870, 30.0),
             _order("P3", 38.2810, -0.6990, 20.0),
         ])  # total 90 kg, cabe
-        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders, use_osrm=False)
 
         plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
 
@@ -157,7 +164,7 @@ class TestHardConstraints(unittest.TestCase):
             _order("P1", 38.2725, -0.6782, 10.0, "08:00", "18:00"),
             _order("P2", 38.2750, -0.6870, 10.0, "08:00", "18:00"),
         ])
-        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders, use_osrm=False)
 
         plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
         self.assertEqual(plan["pedidos_retrasados"], 0,
@@ -172,7 +179,7 @@ class TestHardConstraints(unittest.TestCase):
         orders = pd.DataFrame([
             _order("P1", 38.2725, -0.6782, 500.0),
         ])
-        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders, use_osrm=False)
 
         plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
 
@@ -193,7 +200,7 @@ class TestHardConstraints(unittest.TestCase):
             _order("OK2", 38.2750, -0.6870, 30.0),  # cabe
             _order("BIG", 38.2810, -0.6990, 500.0), # NO cabe
         ])
-        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders, use_osrm=False)
 
         plan = RouteOptimizerFactory.get_optimizer("ortools").optimize(orders, vehicles, dist, times)
 
@@ -210,7 +217,7 @@ class TestHardConstraints(unittest.TestCase):
         orders = pd.DataFrame([
             _order("P1", 38.2725, -0.6782, 10.0),
         ]).iloc[0:0]  # DataFrame vacío con columnas
-        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders)
+        dist, times = self.processor.build_distance_matrix(38.2743, -0.6865, orders, use_osrm=False)
 
         plan = RouteOptimizerFactory.get_optimizer("heuristic").optimize(orders, vehicles, dist, times)
         self.assertEqual(plan["vehiculos_activos"], 0)
@@ -237,6 +244,80 @@ class TestMetricsCoherence(unittest.TestCase):
         self.assertAlmostEqual(savings["ahorro_coste_euros"], 15.0)
         self.assertEqual(savings["retrasos_evitados"], 2)
         self.assertEqual(savings["sobrecargas_evitadas"], 1)
+
+
+class TestOSRMFallback(unittest.TestCase):
+    """El motor debe degradar a Haversine de forma silenciosa cuando OSRM no
+    responde, y de forma estricta cuando el llamador exige OSRM (use_osrm=True)."""
+
+    def setUp(self):
+        self.processor = DataProcessor()
+        self.orders = pd.DataFrame([
+            _order("P1", 38.2725, -0.6782, 10.0),
+            _order("P2", 38.2810, -0.6990, 15.0),
+        ])
+
+    def _force_osrm_failure(self):
+        """Hace que cualquier llamada a OSRM falle con OSRMClientError.
+
+        Sustituimos el método ``table`` del cliente compartido en lugar de
+        mockear ``requests`` para no acoplarnos al detalle interno. Devuelve
+        el método original para que el caller lo restaure.
+        """
+        import osrm_client
+
+        client = osrm_client.get_default_client()
+        original = client.table
+
+        def boom(_coords):
+            raise osrm_client.OSRMClientError("simulado para tests")
+
+        client.table = boom  # type: ignore[method-assign]
+        # Limpiar caché para que la sustitución sí se ejerza
+        client._cache.clear()
+        return client, original
+
+    def test_use_osrm_false_uses_haversine(self):
+        self.processor.build_distance_matrix(38.2743, -0.6865, self.orders, use_osrm=False)
+        self.assertEqual(self.processor.last_matrix_source, "haversine")
+
+    def test_use_osrm_none_falls_back_silently_on_error(self):
+        client, original = self._force_osrm_failure()
+        try:
+            dist, _ = self.processor.build_distance_matrix(
+                38.2743, -0.6865, self.orders, use_osrm=None
+            )
+        finally:
+            client.table = original  # type: ignore[method-assign]
+        # Debe haber caído a Haversine sin propagar la excepción.
+        self.assertEqual(self.processor.last_matrix_source, "haversine")
+        self.assertEqual(dist.shape, (3, 3))
+
+    def test_use_osrm_true_propagates_error(self):
+        from osrm_client import OSRMClientError
+
+        client, original = self._force_osrm_failure()
+        try:
+            with self.assertRaises(OSRMClientError):
+                self.processor.build_distance_matrix(
+                    38.2743, -0.6865, self.orders, use_osrm=True
+                )
+        finally:
+            client.table = original  # type: ignore[method-assign]
+
+    def test_disable_env_var_forces_haversine(self):
+        old = os.environ.get("OPENROUTE_DISABLE_OSRM")
+        os.environ["OPENROUTE_DISABLE_OSRM"] = "1"
+        try:
+            self.processor.build_distance_matrix(
+                38.2743, -0.6865, self.orders, use_osrm=None
+            )
+            self.assertEqual(self.processor.last_matrix_source, "haversine")
+        finally:
+            if old is None:
+                os.environ.pop("OPENROUTE_DISABLE_OSRM", None)
+            else:
+                os.environ["OPENROUTE_DISABLE_OSRM"] = old
 
 
 if __name__ == "__main__":
