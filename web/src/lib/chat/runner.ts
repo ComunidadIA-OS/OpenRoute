@@ -5,8 +5,13 @@ import { TOOL_HANDLERS, type ToolContext } from "./tool-handlers";
 import { SYSTEM_PROMPT } from "./system-prompt";
 import { parseInlineToolCalls } from "./parse-tool-calls";
 
-const MAX_ITERATIONS = 5;
-const MAX_HISTORY = 24; // Trim older messages to keep prompt small
+// MAX_ITERATIONS reducido de 5 a 3 para acotar el peor caso de latencia en
+// CPU: una iteración con llama3.2:3b cuesta 30-90s en Docker Desktop sin GPU,
+// así que 5 iteraciones encadenadas dejaban al usuario "Pensando..." varios
+// minutos. 3 iteraciones cubre el patrón típico: current_time → tool de
+// acción → respuesta final.
+const MAX_ITERATIONS = 3;
+const MAX_HISTORY = 16; // Trim older messages to keep prompt small (antes 24).
 
 export type RunResult = {
   finalText: string;

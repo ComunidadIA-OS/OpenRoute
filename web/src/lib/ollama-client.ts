@@ -53,10 +53,18 @@ export async function ollamaChat(opts: {
     model: opts.model || OLLAMA_MODEL,
     messages: opts.messages,
     stream: false,
-    keep_alive: "30m",
+    // keep_alive 1h en lugar de 30m: en demos largas con pausas entre
+    // preguntas, evita recargar el modelo en RAM (que es lo que cuesta
+    // los primeros 30-60s tras inactividad).
+    keep_alive: "1h",
     options: {
       temperature: opts.temperature ?? 0.2,
-      num_ctx: 4096,
+      // num_ctx reducido de 4096 a 2048: el modelo llama3.2:3b funciona
+      // bien con 2K tokens de contexto, y a la mitad de tokens el tiempo
+      // de inferencia en CPU baja casi proporcionalmente. La historia del
+      // chat ya se trunca a 16 mensajes en runner.ts, así que 2048 es
+      // suficiente para system_prompt + tools + últimos turnos.
+      num_ctx: 2048,
     },
     ...(opts.tools && opts.tools.length ? { tools: opts.tools } : {}),
   };
