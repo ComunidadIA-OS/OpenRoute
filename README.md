@@ -18,38 +18,36 @@ El problema real de la logística local no es calcular una ruta de A a B. El ver
 
 ---
 
-##  Dos componentes complementarios
+##  Arquitectura — un frontend, dos motores de optimización
 
-OpenRoute combina **dos componentes que se ejecutan de forma independiente** en esta versión, y cuya integración HTTP está prevista como siguiente iteración del roadmap:
+OpenRoute presenta un **único producto al usuario**: el frontend conversacional Next.js, donde un chatbot LLM local actúa como centro de comandos. Por detrás conviven dos motores de optimización:
 
-| Componente | Tecnología | Para qué | Cómo arranca |
+| Componente | Función | Cómo se invoca | Cuándo se usa |
 |---|---|---|---|
-| **Backend de optimización** (raíz: `src/`, `app/`, `data/`) | Python + Streamlit + Google OR-Tools + Ollama | Gestor de flota: carga CSV → solver VRP (heurística propia + OR-Tools) → comparativa con plan manual → informe XAI en lenguaje natural | `streamlit run app/main.py` |
-| **Frontend conversacional** (`web/`) | Next.js 14 + Ollama (LLM local) + Leaflet + OSRM | Operación día a día: chatbot en español que consulta pedidos, sugiere rutas, asigna furgonetas y reorganiza ante averías; mapa con polyline por calles reales | `cd web && npm run dev` |
+| **Frontend conversacional (`web/`)** | Next.js 14 + chatbot Ollama + mapa Leaflet + Prisma/SQLite. UI única que ven los usuarios. | `cd web && npm run dev` (puerto 3000) | Siempre. Es la cara del producto. |
+| **Microservicio FastAPI (`app/`)** | Wrapper HTTP sobre el motor VRP de Python (`src/`). Expone `/optimize`, `/baseline`, `/compare`. | `uvicorn app.main:app --port 8000` | Cuando el chatbot llama al tool `optimize_with_ortools`. |
+| **Motor Python (`src/`)** | Solver VRP dual: heurística propia (K-Means + VMC) + Google OR-Tools (CVRPTW). Procesador de datos, simulador baseline manual y asistente IA con Ollama. | Llamado por el FastAPI internamente | Cuando se pide optimización industrial con time windows y capacidades. |
+| **Ollama local** | LLM `llama3.1:8b` con tool calling. Mismo modelo para el chatbot y para los informes explicativos del motor Python. | `ollama serve` (puerto 11434) | Continuamente mientras el chatbot está en uso. |
 
-> **Estado de la integración**: hoy ambos componentes funcionan por separado.
-> El frontend optimiza rutas con OSRM `/trip` (TSP simple, adecuado para
-> demos en tiempo real con pocas paradas) y el backend Python optimiza con
-> OR-Tools (VRP industrial con time windows y capacidades). El siguiente
-> paso del roadmap es exponer el motor Python como microservicio HTTP y
-> que el chatbot del frontend pueda invocarlo cuando el caso lo requiera.
-> Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y
-> [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Flujo típico:**
+
+1. El despachador escribe *"Optimiza el día con OR-Tools"* al chatbot del frontend.
+2. El LLM invoca el tool `optimize_with_ortools`.
+3. Next.js (`web/src/lib/python-optimizer.ts`) hace POST a `:8000/compare` con los pedidos y vehículos actuales de la DB.
+4. El FastAPI llama a `src/optimizer.py` y devuelve plan + baseline + ahorros.
+5. El chatbot resume el resultado en lenguaje natural; el frontend pinta la ruta con polyline real por calles vía OSRM.
+
+Para rutas rápidas con pocas paradas (≤10) el chatbot también puede usar el tool `suggest_routes`, que resuelve un TSP simple directamente con OSRM `/trip` sin necesidad de arrancar el backend Python.
+
+Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) para el detalle técnico.
 
 ---
 
 ##  Características Principales
 
-### Backend Python (optimización)
-
-* **Carga Simple:** Importación directa de pedidos mediante archivos CSV. Cero integraciones complejas.
-* **IA Explicativa (XAI):** No somos una caja negra. El sistema explica *por qué* agrupó ciertas entregas y qué restricciones influyeron en la decisión final.
-* **Gestión de Restricciones:** Soporte para prioridades (alta/media/baja), ventanas horarias y capacidad de vehículos.
-* **Métricas de Impacto:** Comparativa clara entre la ruta manual y la optimizada (ahorro de km y tiempo).
-
-### Frontend conversacional (`web/`)
-
-* **Chatbot como UI principal:** el LLM no es un añadido, es la forma natural de operar. *"Sugiere rutas para hoy"*, *"Asigna la opción B a Juan"*, *"Mi furgo se ha averiado, 60 minutos"*.
+* **Chatbot como UI principal:** el LLM no es un añadido, es la forma natural de operar. *"Sugiere rutas para hoy"*, *"Optimiza con OR-Tools"*, *"Asigna la opción B a Juan"*, *"Mi furgo se ha averiado, 60 minutos"*.
+* **Dos motores de optimización combinables:** TSP rápido (OSRM) integrado, o VRP industrial (Google OR-Tools) cuando hay restricciones estrictas. El chatbot decide o el usuario lo pide explícitamente.
+* **IA Explicativa (XAI):** el motor Python no es una caja negra. Cuando se invoca, devuelve métricas frente a un plan manual baseline (ahorro de km, €, CO₂, retrasos evitados).
 * **Privacidad por diseño:** Ollama corre 100% local, los datos del cliente no salen de la máquina.
 * **Mapa real:** Leaflet + OSRM dibujan la ruta optimizada por calles reales, no líneas rectas.
 * **Auto-gestión de averías:** ante una avería, el chatbot reoptimiza la ruta restante, mueve pedidos al día siguiente y comunica las nuevas ETAs en una sola frase.
@@ -57,22 +55,22 @@ OpenRoute combina **dos componentes que se ejecutan de forma independiente** en 
 
 ---
 
-##  Arquitectura y Tecnologías
+##  Stack técnico
 
-### Backend Python
-* **Interfaz:** [Streamlit](https://streamlit.io/) (Carga de datos, controles y dashboard de resultados).
-* **Procesamiento de Datos:** `pandas` (Limpieza, validación y cálculo de métricas).
-* **Motor de Optimización:** [Google OR-Tools](https://developers.google.com/optimization) (VRP con time windows y capacidades).
-* **Geolocalización y Mapas:** `Folium` / `Pydeck` (Renderizado del mapa interactivo).
-* **IA Generativa:** Modelo LLM open source para la generación de explicaciones en lenguaje natural.
+### Frontend (`web/`)
+* [Next.js 14](https://nextjs.org) (App Router) + TypeScript + Tailwind + shadcn/ui.
+* [Prisma](https://www.prisma.io/) + SQLite (cambio a Postgres con una variable de entorno).
+* [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) + [OSRM](https://project-osrm.org/) público para mapa y TSP rápido.
+* [Nominatim](https://nominatim.openstreetmap.org/) de OSM para geocoding con caché persistente.
+* [Ollama](https://ollama.com/) con `llama3.1:8b` y tool calling nativo.
+* JWT en cookie `httpOnly` para auth.
 
-### Frontend `web/`
-* **Framework:** [Next.js 14](https://nextjs.org) (App Router) + TypeScript + Tailwind + shadcn/ui.
-* **Persistencia:** SQLite + [Prisma](https://www.prisma.io/) (cambio a Postgres con una variable de entorno).
-* **Mapas:** [Leaflet](https://leafletjs.com/) + [OpenStreetMap](https://www.openstreetmap.org/) + [OSRM](https://project-osrm.org/) público para `/trip` y `/route`.
-* **Geocoding:** [Nominatim](https://nominatim.openstreetmap.org/) de OSM con caché persistente.
-* **LLM local:** [Ollama](https://ollama.com/) con `llama3.1:8b` y tool calling nativo.
-* **Auth:** JWT en cookie `httpOnly` (simple, sin OAuth).
+### Backend de optimización (`app/` + `src/`)
+* FastAPI + uvicorn como microservicio HTTP.
+* `pandas` y `numpy` para procesamiento de datos.
+* [Google OR-Tools](https://developers.google.com/optimization) (CVRPTW industrial) en `src/optimizer.py`.
+* Heurística académica propia (K-Means + Vecino Más Cercano Ponderado) como alternativa.
+* Cliente Ollama propio en `src/ai_assistant.py` para generar informes en lenguaje natural.
 
 Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -80,7 +78,7 @@ Arquitectura detallada en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ##  Guía de Instalación y Uso
 
-OpenRoute tiene **dos componentes**. Puedes ejecutar uno, otro o ambos. Lo recomendado durante el desarrollo es tenerlos corriendo en paralelo.
+OpenRoute necesita tres procesos en paralelo: el frontend Next.js, el microservicio Python y Ollama. En tres terminales:
 
 ### 1. Clonar el repositorio
 ```bash
@@ -88,12 +86,19 @@ git clone https://github.com/ComunidadIA-OS/OpenRoute.git
 cd OpenRoute
 ```
 
-### 2A. Backend Python (Streamlit + OR-Tools + Ollama)
+### 2A. Ollama (LLM local) — Terminal 1
 
-Requisitos: **Python 3.9+** y, opcionalmente, **[Ollama](https://ollama.com/)**
-con `llama3.1:8b` corriendo en local para el informe explicativo del
-asistente IA (si no está disponible, el sistema cae a un motor de
-plantillas heurísticas y todo sigue funcionando).
+```bash
+# Descargar el modelo (una sola vez, ~5GB)
+ollama pull llama3.1:8b
+
+# En Windows ya arranca como servicio. En macOS/Linux:
+ollama serve
+```
+
+### 2B. Backend de optimización (FastAPI) — Terminal 2
+
+Requisitos: **Python 3.9+**.
 
 ```bash
 # Crear entorno virtual (recomendado)
@@ -104,35 +109,29 @@ source .venv/bin/activate            # macOS / Linux
 # Instalar dependencias
 pip install -r requirements.txt
 
-# (Opcional) Descargar modelo LLM local para los informes explicativos
-ollama pull llama3.1:8b
-
-# Lanzar el panel del gestor de flota
-streamlit run app/main.py
+# Lanzar el microservicio FastAPI
+uvicorn app.main:app --reload --port 8000
 ```
 
-Abre la URL que muestra Streamlit (típicamente http://localhost:8501).
-Verás:
+Verifica que está vivo: http://localhost:8000/health debería devolver `{"status":"ok",...}`.
 
-- Tabla de pedidos cargados (`data/pedidos_ejemplo.csv`).
-- Mapa interactivo con depósito, paradas y rutas coloreadas por vehículo.
-- Cuadro de impacto frente al plan manual (km, €, CO₂, retrasos).
-- Botón **Generar informe** que produce un análisis ejecutivo en
-  lenguaje natural con el LLM local.
+Los endpoints disponibles:
+- `GET  /health` — comprobación.
+- `POST /optimize` — devuelve el plan optimizado.
+- `POST /baseline` — devuelve el plan manual de referencia.
+- `POST /compare` — devuelve ambos + cuadro de ahorros (el que usa el chatbot).
 
-#### Tests del motor
-
-Si solo quieres verificar el motor sin UI:
+#### Probar el motor sin UI
 
 ```bash
 # Suite unitaria (4 tests matemáticos)
-cd src && python -m unittest test_optimizer.py -v
+python -m unittest src/test_optimizer.py -v
 
 # Test end-to-end con reporte comparativo en consola
-python test_run.py
+python src/test_run.py
 ```
 
-### 2B. Frontend conversacional (`web/`)
+### 2C. Frontend conversacional (`web/`) — Terminal 3
 
 Requisitos: **Node.js 20+**, **[Ollama](https://ollama.com/download)** instalado, **~5 GB** libres para el modelo, conexión a internet (para OSRM y Nominatim públicos).
 
