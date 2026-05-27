@@ -1,6 +1,17 @@
-// llama3.1:8b sometimes emits tool calls as inline JSON text instead of using the
-// structured tool_calls API field. This parser detects those patterns and converts
-// them into synthetic ToolCall objects so the runner can still execute them.
+// Los modelos pequeños de Llama (3.2:1b sobre todo) y a veces los grandes
+// (3.1:8b) emiten tool calls como JSON en línea dentro del campo `content`
+// en lugar de usar el campo estructurado `tool_calls` del protocolo de
+// Ollama. Este parser detecta esos patrones y los convierte en ToolCall
+// sintéticos para que el runner los pueda ejecutar.
+//
+// Schemas vistos en el campo:
+//   1. { "name": "tool",     "parameters": {...} }              ← estándar Llama
+//   2. { "name": "tool",     "arguments": {...} }               ← variante OpenAI
+//   3. { "function": { "name": "tool", "arguments": {...} } }   ← estructura OpenAI
+//   4. { "function": "tool", "parameters": {...} }              ← llama3.2:1b (string!)
+//   5. { "function": "tool", "arguments": {...} }               ← variante de 4
+//   6. { "tool": "tool",     "arguments": {...} }               ← alias menos común
+//   7. { "tool_name": "tool", "args": {...} }                    ← otro alias
 
 import type { ToolCall } from "../ollama-client";
 
@@ -20,9 +31,6 @@ const KNOWN_TOOLS = new Set([
   "reschedule_route",
   "mark_stop_delivered",
 ]);
-
-// Match {"name": "tool", "parameters": {...}} or {"name": "tool", "arguments": {...}}
-// Also matches the variant {"function": {"name": "tool", "arguments": {...}}}
 export function parseInlineToolCalls(text: string): { toolCalls: ToolCall[]; remaining: string } {
   const toolCalls: ToolCall[] = [];
   if (!text) return { toolCalls, remaining: "" };
@@ -104,22 +112,38 @@ function tryParseAsToolCall(jsonText: string): ToolCall | null {
   if (!parsed || typeof parsed !== "object") return null;
   const p = parsed as Record<string, unknown>;
 
-  // Form 1: { name, parameters }
-  // Form 2: { name, arguments }
-  // Form 3: { function: { name, arguments } }
+  // Aceptamos los 7 schemas más comunes que sueltan Llama 3.1 y 3.2 cuando
+  // emiten el tool call inline en lugar de en el campo estructurado.
   let name: string | undefined;
   let args: Record<string, unknown> | undefined;
+
+  // Form 1 / 2: { name: "tool", parameters/arguments: {...} }
   if (typeof p.name === "string") {
     name = p.name;
-    if (p.parameters && typeof p.parameters === "object") args = p.parameters as Record<string, unknown>;
-    else if (p.arguments && typeof p.arguments === "object") args = p.arguments as Record<string, unknown>;
-    else args = {};
-  } else if (p.function && typeof p.function === "object") {
+    args = extractArgs(p);
+  }
+  // Form 4 / 5: { function: "tool", parameters/arguments: {...} } ← llama3.2:1b
+  else if (typeof p.function === "string") {
+    name = p.function;
+    args = extractArgs(p);
+  }
+  // Form 3: { function: { name: "tool", arguments: {...} } }
+  else if (p.function && typeof p.function === "object") {
     const f = p.function as Record<string, unknown>;
     if (typeof f.name === "string") {
       name = f.name;
-      args = (f.arguments as Record<string, unknown>) || {};
+      args = extractArgs(f);
     }
+  }
+  // Form 6: { tool: "tool", arguments: {...} }
+  else if (typeof p.tool === "string") {
+    name = p.tool;
+    args = extractArgs(p);
+  }
+  // Form 7: { tool_name: "tool", args: {...} }
+  else if (typeof p.tool_name === "string") {
+    name = p.tool_name;
+    args = extractArgs(p);
   }
 
   if (!name || !KNOWN_TOOLS.has(name)) return null;
@@ -127,4 +151,30 @@ function tryParseAsToolCall(jsonText: string): ToolCall | null {
     id: `inline_${Math.random().toString(36).slice(2, 10)}`,
     function: { name, arguments: args || {} },
   };
+}
+
+/**
+ * Extrae los argumentos del tool call probando los keys más comunes en orden
+ * de probabilidad. Si vienen como string (algunos modelos los meten como
+ * JSON serializado), intenta parsearlos.
+ */
+function extractArgs(obj: Record<string, unknown>): Record<string, unknown> {
+  const candidates = ["arguments", "parameters", "args", "params", "input"] as const;
+  for (const key of candidates) {
+    const v = obj[key];
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      return v as Record<string, unknown>;
+    }
+    if (typeof v === "string" && v.trim().startsWith("{")) {
+      try {
+        const parsed = JSON.parse(v);
+        if (parsed && typeof parsed === "object") {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // ignore — seguimos probando otras keys
+      }
+    }
+  }
+  return {};
 }
