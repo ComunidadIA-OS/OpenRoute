@@ -89,8 +89,12 @@ class DataProcessor:
             if col not in df.columns:
                 raise ValueError(f"Falta la columna obligatoria '{col}' en los datos de pedidos.")
 
-        # Limpieza de tipos y valores nulos
-        df = df.dropna(subset=['id_pedido', 'lat', 'lon', 'peso_kg'])
+        # Limpieza de tipos y valores nulos.
+        # dropna() devuelve una vista en algunas versiones de pandas; copiamos
+        # explícitamente para que las asignaciones posteriores no disparen
+        # SettingWithCopyWarning (ruido innecesario en la salida de FastAPI
+        # durante la demo).
+        df = df.dropna(subset=['id_pedido', 'lat', 'lon', 'peso_kg']).copy()
         df['prioridad'] = df['prioridad'].fillna(1).astype(int)
         df['peso_kg'] = df['peso_kg'].astype(float)
 
