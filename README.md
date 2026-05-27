@@ -20,14 +20,21 @@ El problema real de la logística local no es calcular una ruta de A a B. El ver
 
 ##  Dos componentes complementarios
 
-OpenRoute combina dos piezas que pueden usarse de forma **independiente** o **integrada**:
+OpenRoute combina **dos componentes que se ejecutan de forma independiente** en esta versión, y cuya integración HTTP está prevista como siguiente iteración del roadmap:
 
-| Componente | Tecnología | Para qué |
-|---|---|---|
-| **Backend de optimización** (raíz del repo) | Python + Streamlit + Google OR-Tools | Resolver VRP con time windows y capacidades. Explicaciones XAI de las decisiones del solver. UI para el gestor de flota: carga CSV → rutas → métricas. |
-| **Frontend conversacional** (`web/`) | Next.js 14 + Ollama (LLM local) + Leaflet + OSRM | Centro de comandos en español: chatbot que consulta pedidos, sugiere rutas optimizadas, asigna furgonetas y reorganiza automáticamente ante averías. |
+| Componente | Tecnología | Para qué | Cómo arranca |
+|---|---|---|---|
+| **Backend de optimización** (raíz: `src/`, `app/`, `data/`) | Python + Streamlit + Google OR-Tools + Ollama | Gestor de flota: carga CSV → solver VRP (heurística propia + OR-Tools) → comparativa con plan manual → informe XAI en lenguaje natural | `streamlit run app/main.py` |
+| **Frontend conversacional** (`web/`) | Next.js 14 + Ollama (LLM local) + Leaflet + OSRM | Operación día a día: chatbot en español que consulta pedidos, sugiere rutas, asigna furgonetas y reorganiza ante averías; mapa con polyline por calles reales | `cd web && npm run dev` |
 
-Para el detalle de arquitectura y cómo evolucionará la integración entre ambos, ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+> **Estado de la integración**: hoy ambos componentes funcionan por separado.
+> El frontend optimiza rutas con OSRM `/trip` (TSP simple, adecuado para
+> demos en tiempo real con pocas paradas) y el backend Python optimiza con
+> OR-Tools (VRP industrial con time windows y capacidades). El siguiente
+> paso del roadmap es exponer el motor Python como microservicio HTTP y
+> que el chatbot del frontend pueda invocarlo cuando el caso lo requiera.
+> Ver [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y
+> [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -81,9 +88,12 @@ git clone https://github.com/ComunidadIA-OS/OpenRoute.git
 cd OpenRoute
 ```
 
-### 2A. Backend Python (Streamlit + OR-Tools)
+### 2A. Backend Python (Streamlit + OR-Tools + Ollama)
 
-Requisitos: **Python 3.9+**.
+Requisitos: **Python 3.9+** y, opcionalmente, **[Ollama](https://ollama.com/)**
+con `llama3.1:8b` corriendo en local para el informe explicativo del
+asistente IA (si no está disponible, el sistema cae a un motor de
+plantillas heurísticas y todo sigue funcionando).
 
 ```bash
 # Crear entorno virtual (recomendado)
@@ -94,11 +104,33 @@ source .venv/bin/activate            # macOS / Linux
 # Instalar dependencias
 pip install -r requirements.txt
 
-# Lanzar la app Streamlit
+# (Opcional) Descargar modelo LLM local para los informes explicativos
+ollama pull llama3.1:8b
+
+# Lanzar el panel del gestor de flota
 streamlit run app/main.py
 ```
 
 Abre la URL que muestra Streamlit (típicamente http://localhost:8501).
+Verás:
+
+- Tabla de pedidos cargados (`data/pedidos_ejemplo.csv`).
+- Mapa interactivo con depósito, paradas y rutas coloreadas por vehículo.
+- Cuadro de impacto frente al plan manual (km, €, CO₂, retrasos).
+- Botón **Generar informe** que produce un análisis ejecutivo en
+  lenguaje natural con el LLM local.
+
+#### Tests del motor
+
+Si solo quieres verificar el motor sin UI:
+
+```bash
+# Suite unitaria (4 tests matemáticos)
+cd src && python -m unittest test_optimizer.py -v
+
+# Test end-to-end con reporte comparativo en consola
+python test_run.py
+```
 
 ### 2B. Frontend conversacional (`web/`)
 

@@ -4,9 +4,11 @@ from metrics import MetricsEngine
 from optimizer import RouteOptimizerFactory
 
 def run_test():
-    workspace_dir = "/Users/samuelparraechague/Developer/3_Workspace_Cloudecode"
-    orders_path = os.path.join(workspace_dir, "data/pedidos_ejemplo.csv")
-    vehicles_path = os.path.join(workspace_dir, "data/vehiculos_config.json")
+    # Paths relativos a la raíz del repo (un nivel por encima de src/).
+    here = os.path.dirname(os.path.abspath(__file__))
+    repo_root = os.path.abspath(os.path.join(here, os.pardir))
+    orders_path = os.path.join(repo_root, "data", "pedidos_ejemplo.csv")
+    vehicles_path = os.path.join(repo_root, "data", "vehiculos_config.json")
     
     print("=" * 60)
     print("INICIANDO PRUEBA COMPLETA DE MOTOR LOGÍSTICO - OPENROUTE")
