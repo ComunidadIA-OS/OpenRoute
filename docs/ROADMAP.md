@@ -1,25 +1,29 @@
 # Hoja de ruta de OpenRoute
 
-Lo que existe hoy (MVP del hackathon) cubre dos vías complementarias:
-- **Backend Python**: optimización VRP con OR-Tools y explicaciones XAI vía Streamlit.
-- **Frontend `web/`**: chatbot LLM local como centro de comandos con mapa Leaflet y auto-gestión de averías.
+Lo que existe hoy (entrega del hackathon Mayo'26) cubre dos componentes complementarios e integrados por HTTP:
+- **Microservicio Python (FastAPI)**: motor de optimización VRP con OR-Tools, matriz real OSRM y explicaciones XAI vía Ollama local.
+- **Frontend `web/` (Next.js)**: chatbot LLM local como centro de comandos con mapa Leaflet, importador de CSV y auto-gestión de averías.
 
 Esta hoja de ruta describe lo que viene **después** del hackathon.
 
 ## Estado actual (mayo 2026 — entrega del hackathon)
 
-### Backend Python (raíz)
-- ✅ Carga de CSV con validación
+### Motor de optimización (raíz: `app/`, `src/`)
+- ✅ Carga de CSV con validación y bbox configurable (env var + argumento)
 - ✅ Solver VRP con OR-Tools y restricciones (tiempo, capacidad, prioridades)
-- ✅ Simulador baseline manual para comparar (en `metrics.py`)
-- ✅ Asistente IA explicativo (XAI) de las decisiones del solver
-- ✅ UI Streamlit con dashboard y mapa
-- ✅ Suite inicial de tests unitarios
+- ✅ DISJUNCTIONS en OR-Tools para diferir pedidos infactibles sin caer al fallback completo
+- ✅ Matriz de distancias real con OSRM `/table` + fallback automático a Haversine
+- ✅ Simulador baseline manual realista (zona + urgencia de ventana) en `metrics.py`
+- ✅ Asistente IA explicativo (XAI) de las decisiones del solver (`ai_assistant.py`)
+- ✅ Microservicio FastAPI con endpoints `/health`, `/optimize`, `/baseline`, `/compare`, `/optimize-csv`
+- ✅ 24 tests unitarios cubriendo schema, restricciones duras, OSRM fallback, bbox y serialización JSON
 
 ### Frontend web/
 - ✅ Login con JWT + roles ADMIN/DRIVER
 - ✅ Tabla de pedidos con filtros, búsqueda y CRUD (geocoding en vivo)
-- ✅ Chatbot LLM con 13 tools y parser tolerante de fallos del modelo
+- ✅ Chatbot LLM con 14 tools y parser tolerante de fallos del modelo
+- ✅ Tool `optimize_with_ortools` que delega al microservicio Python (CVRPTW industrial)
+- ✅ Pantalla `/import` con dropzone para CSVs sin tocar la DB, análisis combinado entre archivos
 - ✅ Optimización VRP simple vía OSRM `/trip` con 3 opciones por sector
 - ✅ Asignación de rutas a conductor + furgoneta
 - ✅ Mapa Leaflet con polyline real por calles y marcadores numerados
@@ -27,27 +31,27 @@ Esta hoja de ruta describe lo que viene **después** del hackathon.
 - ✅ Auto-gestión de averías: el chatbot reoptimiza rutas y difiere pedidos al día siguiente
 - ✅ Sistema de incidencias con auditoría
 
+### Operativa y entrega
+- ✅ Licencia Apache 2.0, `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`
+- ✅ Autoevaluación HRIA (esqueleto firmado) en [`docs/HRIA.md`](HRIA.md)
+- ✅ CI con GitHub Actions: lint + typecheck + build del frontend en cada PR
+- ✅ Docker + `docker-compose.yml` orquestando optimizer + ollama + web con un solo comando
+
 ---
 
-## Corto plazo (1-2 meses) — Integración y producción mínima viable
+## Corto plazo (1-2 meses) — Producción mínima viable
 
-Objetivo: pasar de prototipo hackathon (TRL5-6) a piloto desplegable en una PYME real (TRL7).
-
-### Integración Python ↔ web/
-- [ ] Exponer el optimizador Python como microservicio HTTP (FastAPI).
-- [ ] Añadir tool `optimize_with_or_tools` al chatbot del frontend.
-- [ ] El chatbot decide automáticamente: para ≤15 paradas usa OSRM `/trip`; para >15 paradas o time windows estrictas delega al backend Python.
-- [ ] Pasar las explicaciones XAI del backend al frontend para mostrarlas al usuario.
+Objetivo: pasar de prototipo hackathon a piloto desplegable en una PYME real (TRL7).
 
 ### Calidad y CI
-- [ ] **Tests automatizados frontend**: Vitest para `lib/`, Playwright para flujos críticos.
-- [ ] **Tests automatizados backend**: ampliar la suite pytest existente, coverage mínimo 60%.
-- [ ] **CI/CD con GitHub Actions**: lint + typecheck + tests en cada PR.
+- [ ] **Tests del frontend**: Vitest para `lib/`, Playwright para flujos críticos.
+- [ ] **Ampliar suite del motor** con casos de equidad geográfica y datasets reales medidos.
+- [ ] **CI también para Python**: ejecutar `python -m unittest src/test_optimizer.py` en cada PR.
 
-### Despliegue
-- [ ] **Docker** para ambos componentes.
-- [ ] `docker-compose.yml` con backend Python + frontend Next.js + Ollama + (opcional) OSRM self-hosted + Postgres.
-- [ ] Documentar deploy en VPS pequeño (Hetzner, DigitalOcean).
+### Despliegue en producción
+- [ ] Imágenes Docker publicadas en GHCR para que el cliente no rebuilde.
+- [ ] Guía de deploy en VPS pequeño (Hetzner, DigitalOcean).
+- [ ] OSRM auto-hospedado opcional (compose perfil) para datasets >100 puntos sin chunkear.
 
 ### Persistencia robusta
 - [ ] **Migración SQLite → PostgreSQL** en producción (sólo cambio de `DATABASE_URL`).
