@@ -70,7 +70,7 @@ Ambos componentes pueden ejecutarse de forma **independiente** (el motor Python 
 │  └───────────────────────────┘  └────┬───────────────────┘   │
 │                                       │                       │
 │                    ┌──────────────────▼─────────┐             │
-│                    │  TOOL HANDLERS (13 tools)  │             │
+│                    │  TOOL HANDLERS (14 tools)  │             │
 │                    │  → list_orders             │             │
 │                    │  → suggest_routes          │             │
 │                    │  → assign_route            │             │
@@ -147,7 +147,7 @@ web/
     │   ├── optimize.ts           ← suggestRoutes() + rescheduleRoute()
     │   ├── format.ts             ← Helpers de formato es-ES
     │   └── chat/
-    │       ├── tools.ts          ← Definición JSONSchema de 13 tools
+    │       ├── tools.ts          ← Definición JSONSchema de 14 tools
     │       ├── tool-handlers.ts  ← Implementación de cada tool
     │       ├── runner.ts         ← Loop tool-calling (máx 5 iter)
     │       ├── parse-tool-calls.ts ← Parser tolerante de tool calls inline
@@ -187,7 +187,7 @@ web/
 
 ### Sistema de tool calling del chatbot
 
-15 tools definidos en `lib/chat/tools.ts`:
+14 tools definidos en `lib/chat/tools.ts`:
 
 | Tool | Propósito |
 |---|---|
