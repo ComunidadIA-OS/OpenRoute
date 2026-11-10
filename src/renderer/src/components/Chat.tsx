@@ -1,5 +1,5 @@
 import { ArrowUp, Check, ChevronDown, LoaderCircle, Paperclip, Square, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessage, ChatPart } from '@shared/types'
@@ -165,7 +165,7 @@ export function Chat() {
   const [text, setText] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
-  const messages = app.active?.messages ?? []
+  const messages = useMemo(() => app.active?.messages ?? [], [app.active?.messages])
   const running = app.chatRunning
   const lastId = messages[messages.length - 1]?.id
 
