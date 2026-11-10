@@ -1,0 +1,49 @@
+appId: es.openroute.app
+productName: OpenRoute
+copyright: Copyright © 2026 OpenRoute
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+  - package.json
+  - '!**/*.map'
+extraResources:
+  - from: resources/samples
+    to: samples
+asarUnpack:
+  - resources/**
+win:
+  executableName: OpenRoute
+  icon: build/icon.png
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: OpenRoute-Setup.${ext}
+  shortcutName: OpenRoute
+  uninstallDisplayName: OpenRoute
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+mac:
+  icon: build/icon.png
+  category: public.app-category.business
+  target: [dmg]
+  notarize: false
+dmg:
+  artifactName: OpenRoute-${version}.${ext}
+linux:
+  icon: build/icon.png
+  target: [AppImage]
+  category: Office
+  maintainer: OpenRoute
+appImage:
+  artifactName: OpenRoute-${version}.${ext}
+npmRebuild: false
+publish:
+  provider: github
+  owner: ComunidadIA-OS
+  repo: OpenRoute
