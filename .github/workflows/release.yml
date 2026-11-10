@@ -1,0 +1,35 @@
+name: Release
+
+# Al subir una etiqueta vX.Y.Z se genera el instalador de Windows y se
+# publica en la release de esa versión.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run dist:win
+      - name: Publicar en la release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          NOTES=$(awk "/^## \[${TAG#v}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/OpenRoute-Setup.exe --clobber
+          else
+            gh release create "$TAG" dist/OpenRoute-Setup.exe --title "OpenRoute $TAG" --notes "$NOTES"
+          fi
