@@ -1,0 +1,25 @@
+OpenRoute
+Copyright 2026 OpenRoute
+
+Este producto incluye software desarrollado por el equipo de OpenRoute y
+se distribuye bajo la licencia Apache 2.0 (ver LICENSE).
+
+Marcas
+------
+«OpenRoute» y el isotipo «Red radial» son marcas de sus titulares. La
+licencia Apache 2.0 no concede derechos sobre ellas (sección 6). Puedes
+usar, modificar y redistribuir el código, pero un fork publicado debe
+llevar otro nombre y otro logotipo.
+
+Software y datos de terceros
+----------------------------
+- Iconos de proveedores de IA: @lobehub/icons-static-svg, licencia MIT,
+  © LobeHub. Los logotipos pertenecen a sus respectivas empresas y se usan
+  solo para identificar a cada proveedor.
+- MapLibre GL JS, licencia BSD-3-Clause.
+- Tipografía Geist y Geist Mono, SIL Open Font License 1.1, © Vercel.
+- Datos de mapa © colaboradores de OpenStreetMap (ODbL), servidos por
+  OpenFreeMap con el esquema OpenMapTiles.
+- Rutas por calles: OSRM (BSD-2-Clause). Geocodificación: Nominatim.
+- Pedidos de ejemplo (resources/samples): datos ficticios creados por el
+  equipo de OpenRoute.
