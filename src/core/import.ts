@@ -84,7 +84,9 @@ function parseNumber(value: unknown): number | null {
 }
 
 export function parsePriority(value: unknown): Priority {
-  const s = String(value ?? '').trim().toLowerCase()
+  const s = String(value ?? '')
+    .trim()
+    .toLowerCase()
   if (['3', 'alta', 'high', 'urgente', 'a'].includes(s)) return 3
   if (['1', 'baja', 'low', 'c'].includes(s)) return 1
   return 2
@@ -198,7 +200,7 @@ export function rowsToOrders(rows: Record<string, unknown>[], headers: string[])
 }
 
 export function parseOrdersCsv(csv: string): ImportResult {
-  const parsed = Papa.parse<Record<string, string>>(csv.replace(/^﻿/, ''), {
+  const parsed = Papa.parse<Record<string, string>>(csv.replace(/^\uFEFF/, ''), {
     header: true,
     skipEmptyLines: 'greedy',
     transformHeader: (h) => h.trim()
@@ -213,7 +215,8 @@ export function parseOrdersCsv(csv: string): ImportResult {
 
 /** Filas tipo Excel (la primera es la cabecera). */
 export function parseOrdersTable(table: unknown[][]): ImportResult {
-  if (table.length === 0) return { orders: [], errors: [{ row: 1, message: 'El archivo está vacío.' }], warnings: [], columns: {} }
+  if (table.length === 0)
+    return { orders: [], errors: [{ row: 1, message: 'El archivo está vacío.' }], warnings: [], columns: {} }
   const headers = table[0].map((h) => text(h))
   const rows = table.slice(1).map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i]])))
   return rowsToOrders(rows, headers)

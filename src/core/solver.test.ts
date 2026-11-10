@@ -61,7 +61,11 @@ describe('solve', () => {
 
   it('respeta la capacidad de cada vehículo', () => {
     const orders = Array.from({ length: 6 }, (_, i) => order(`P${i}`, 38.27 + i * 0.003, -0.69, { weightKg: 100 }))
-    const res = run(orders, [van('A', { capacityKg: 250 }), van('B', { capacityKg: 250 }), van('C', { capacityKg: 250 })])
+    const res = run(orders, [
+      van('A', { capacityKg: 250 }),
+      van('B', { capacityKg: 250 }),
+      van('C', { capacityKg: 250 })
+    ])
     for (const r of res.routes) expect(r.loadKg).toBeLessThanOrEqual(250)
     expect(res.unassigned).toHaveLength(0)
   })

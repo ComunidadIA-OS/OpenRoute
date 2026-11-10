@@ -12,16 +12,7 @@
 // Es determinista: con la misma entrada y la misma semilla da el mismo plan.
 
 import { toMinutes } from './time'
-import type {
-  Depot,
-  LocatedOrder,
-  PlanTotals,
-  Route,
-  Stop,
-  TravelMatrix,
-  Unassigned,
-  Vehicle
-} from './types'
+import type { Depot, LocatedOrder, PlanTotals, Route, Stop, TravelMatrix, Unassigned, Vehicle } from './types'
 
 /** Gramos de CO₂ por km. Estimación media de una furgoneta de reparto. */
 export const CO2_G_PER_KM = { diesel: 250, electric: 40 }
@@ -251,7 +242,6 @@ function recreate(ctx: Ctx, s: State): void {
 }
 
 function twoOpt(ctx: Ctx, s: State): boolean {
-  let improved = false
   for (let r = 0; r < s.routes.length; r++) {
     const seq = s.routes[r]
     for (let a = 0; a < seq.length - 1; a++) {
@@ -261,13 +251,12 @@ function twoOpt(ctx: Ctx, s: State): boolean {
         if (c < s.costs[r] - 1e-9) {
           s.routes[r] = cand
           s.costs[r] = c
-          improved = true
           return true
         }
       }
     }
   }
-  return improved
+  return false
 }
 
 function relocate(ctx: Ctx, s: State): boolean {
