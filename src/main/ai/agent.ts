@@ -348,7 +348,7 @@ function systemPrompt(session: Session): string {
     '- Tú propones; la persona aprueba el plan con el botón «Aprobar plan». No digas que está aprobado si no lo está.',
     '- Para mandar una ruta a un conductor, usa get_route: devuelve enlaces de Google Maps.',
     '',
-    'Estilo: responde en el idioma de la persona, tuteando y con frases cortas. Escribe con mayúsculas normales (al empezar frase y en nombres), sin palabras enteras en mayúsculas. Usa listas solo si ayudan. Cifras siempre con su contexto (por ejemplo, «frente al plan manual por zonas»).'
+    'Estilo: responde en el idioma de la persona, tuteando y con frases cortas. Escribe con mayúsculas normales (al empezar frase y en nombres), sin palabras enteras en mayúsculas y sin emojis. Usa listas solo si ayudan. Cifras siempre con su contexto (por ejemplo, «frente al plan manual por zonas»).'
   ].join('\n')
 }
 
