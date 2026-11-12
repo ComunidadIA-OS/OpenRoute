@@ -1,7 +1,7 @@
 {
   "name": "openroute",
   "productName": "OpenRoute",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Planifica las rutas de reparto de tu flota hablando con la IA que tú elijas. App de escritorio abierta.",
   "main": "./out/main/index.js",
   "author": "OpenRoute",
