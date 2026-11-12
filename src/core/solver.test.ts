@@ -40,9 +40,9 @@ function van(id: string, extra: Partial<Vehicle> = {}): Vehicle {
   }
 }
 
-function run(orders: LocatedOrder[], vehicles: Vehicle[], timeLimitMs = 300) {
+function run(orders: LocatedOrder[], vehicles: Vehicle[], iterations = 200) {
   const matrix = haversineMatrix([depot, ...orders])
-  return solve({ depot, vehicles, orders, matrix, timeLimitMs })
+  return solve({ depot, vehicles, orders, matrix, iterations })
 }
 
 function sampleOrders(): LocatedOrder[] {
@@ -103,21 +103,24 @@ describe('solve', () => {
     expect(res.unassigned.map((u) => u.orderId)).toEqual(['baja'])
   })
 
-  it('es determinista con la misma semilla', () => {
+  it('es determinista: misma entrada, mismo plan', () => {
     const orders = sampleOrders()
     const matrix = haversineMatrix([SAMPLE_DEPOT, ...orders])
-    const a = solve({ depot: SAMPLE_DEPOT, vehicles: SAMPLE_VEHICLES, orders, matrix, timeLimitMs: 400, seed: 3 })
-    const b = solve({ depot: SAMPLE_DEPOT, vehicles: SAMPLE_VEHICLES, orders, matrix, timeLimitMs: 400, seed: 3 })
-    // El LNS depende del tiempo; la construcción y la búsqueda local no.
-    expect(a.unassigned).toEqual(b.unassigned)
-    expect(a.totals.distanceKm).toBeGreaterThan(0)
+    const input = { depot: SAMPLE_DEPOT, vehicles: SAMPLE_VEHICLES, orders, matrix, iterations: 400, seed: 3 }
+    const a = solve(input)
+    const b = solve(input)
+    expect(a.totals).toEqual(b.totals)
+    expect(a.routes.map((r) => r.stops.map((s) => s.orderId))).toEqual(
+      b.routes.map((r) => r.stops.map((s) => s.orderId))
+    )
+    expect(a.iterations).toBe(400)
   })
 
   it('mejora al plan manual por zonas con los pedidos de ejemplo', () => {
     const orders = sampleOrders()
     const matrix = haversineMatrix([SAMPLE_DEPOT, ...orders])
     const input = { depot: SAMPLE_DEPOT, vehicles: SAMPLE_VEHICLES, orders, matrix }
-    const res = solve({ ...input, timeLimitMs: 1500 })
+    const res = solve({ ...input, iterations: 800 })
     const base = manualBaseline(input)
     expect(res.unassigned).toHaveLength(0)
     expect(res.totals.lateStops).toBe(0)

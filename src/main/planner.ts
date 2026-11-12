@@ -82,7 +82,8 @@ export async function planSession(session: Session): Promise<Plan> {
     setBusy({ stage: 'solving', label: `Optimizando ${orders.length} pedidos en ${vehicles.length} vehículos` })
     const serviceMin = store.state.settings.serviceMin
     const input = { depot, vehicles, orders, matrix, serviceMin }
-    const timeLimitMs = Math.min(10_000, Math.max(2500, orders.length * 90))
+    // Tope de seguridad: con muchos pedidos el motor para aquí aunque le queden vueltas.
+    const timeLimitMs = 20_000
     // Cede el hilo para que la interfaz pinte el estado antes de calcular.
     await new Promise((r) => setTimeout(r, 30))
     const result = solve({ ...input, timeLimitMs })

@@ -24,7 +24,12 @@ export interface SolveInput {
   orders: LocatedOrder[]
   matrix: TravelMatrix
   serviceMin?: number
+  /** Tope de seguridad. El resultado no depende de él salvo que se alcance. */
   timeLimitMs?: number
+  /** Vueltas de destrucción y reconstrucción. Por defecto, según el tamaño. */
+  iterations?: number
+  /** Arranques independientes; las vueltas se reparten entre ellos. */
+  restarts?: number
   seed?: number
 }
 
@@ -33,6 +38,15 @@ export interface SolveResult {
   unassigned: Unassigned[]
   totals: PlanTotals
   solveMs: number
+  /** Vueltas hechas. Si es menor que las pedidas, se alcanzó el tope de tiempo. */
+  iterations: number
+}
+
+export const DEFAULT_RESTARTS = 16
+
+/** Vueltas por defecto: más pedidos, más vueltas, con un máximo. */
+export function defaultIterations(orders: number): number {
+  return Math.min(4000, Math.max(1600, orders * 100))
 }
 
 interface Ctx {
@@ -400,41 +414,57 @@ function unassignedReason(ctx: Ctx, i: number): string {
 export function solve(input: SolveInput): SolveResult {
   const t0 = Date.now()
   const ctx = buildCtx(input)
-  const timeLimit = input.timeLimitMs ?? 1500
-  const deadline = t0 + timeLimit
-  const random = rng(input.seed ?? 7)
+  const deadline = t0 + (input.timeLimitMs ?? 30_000)
+  const iterations = input.iterations ?? defaultIterations(input.orders.length)
+  const restarts = Math.max(1, input.restarts ?? DEFAULT_RESTARTS)
+  const perRun = Math.ceil(iterations / restarts)
+  const baseSeed = input.seed ?? 7
 
-  let current: State = {
-    routes: ctx.vehicles.map(() => []),
-    costs: ctx.vehicles.map(() => 0),
-    unrouted: new Set(ctx.orders.map((_, i) => i))
-  }
-  recreate(ctx, current)
-  localSearch(ctx, current, deadline)
-  let best = clone(current)
-  let bestCost = totalCost(ctx, best)
-
-  // LNS con un umbral de aceptación que baja con el tiempo.
-  while (Date.now() < deadline && ctx.orders.length > 2) {
-    const cand = clone(current)
-    ruin(ctx, cand, random)
-    recreate(ctx, cand)
-    localSearch(ctx, cand, deadline)
-    const c = totalCost(ctx, cand)
-    const progress = (Date.now() - t0) / timeLimit
-    const threshold = totalCost(ctx, current) * 0.02 * (1 - progress)
-    if (c < totalCost(ctx, current) + threshold) current = cand
-    if (c < bestCost - 1e-9) {
-      best = clone(cand)
-      bestCost = c
+  let best: State | null = null
+  let bestCost = Infinity
+  let done = 0
+  // Varios arranques independientes con semillas distintas; gana el mejor.
+  for (let r = 0; r < restarts && Date.now() < deadline; r++) {
+    const random = rng(baseSeed + r * 7919)
+    const current: State = {
+      routes: ctx.vehicles.map(() => []),
+      costs: ctx.vehicles.map(() => 0),
+      unrouted: new Set(ctx.orders.map((_, i) => i))
+    }
+    recreate(ctx, current)
+    localSearch(ctx, current, deadline)
+    let run = current
+    let runBest = clone(current)
+    let runBestCost = totalCost(ctx, runBest)
+    // Destrucción y reconstrucción con aceptación «récord a récord»: se acepta
+    // un plan si no empeora más de un margen el mejor de este arranque, y el
+    // margen se cierra vuelta a vuelta. Se cuenta en vueltas, no en segundos,
+    // para que el resultado no dependa de la velocidad del ordenador.
+    for (let it = 0; it < perRun && ctx.orders.length > 2 && Date.now() < deadline; it++, done++) {
+      const cand = clone(run)
+      ruin(ctx, cand, random)
+      recreate(ctx, cand)
+      localSearch(ctx, cand, deadline)
+      const c = totalCost(ctx, cand)
+      const margin = 0.03 * (1 - it / perRun)
+      if (c < runBestCost * (1 + margin)) run = cand
+      if (c < runBestCost - 1e-9) {
+        runBest = clone(cand)
+        runBestCost = c
+      }
+    }
+    if (runBestCost < bestCost - 1e-9) {
+      best = runBest
+      bestCost = runBestCost
     }
   }
 
-  const routes = best.routes.map((seq, v) => toRoute(ctx, v, seq))
-  const unassigned = [...best.unrouted]
+  const final = best!
+  const routes = final.routes.map((seq, v) => toRoute(ctx, v, seq))
+  const unassigned = [...final.unrouted]
     .sort((a, b) => a - b)
     .map((i) => ({ orderId: ctx.orders[i].id, reason: unassignedReason(ctx, i) }))
-  return { routes, unassigned, totals: totalsOf(routes), solveMs: Date.now() - t0 }
+  return { routes, unassigned, totals: totalsOf(routes), solveMs: Date.now() - t0, iterations: done }
 }
 
 /**
@@ -442,7 +472,7 @@ export function solve(input: SolveInput): SolveResult {
  * un pedido a mano). No rechaza nada: marca retrasos y sobrecargas.
  */
 export function evaluateAssignment(
-  input: Omit<SolveInput, 'timeLimitMs' | 'seed'>,
+  input: Omit<SolveInput, 'timeLimitMs' | 'seed' | 'iterations' | 'restarts'>,
   assignment: Record<string, string[]>
 ): Route[] {
   const ctx = buildCtx(input)
