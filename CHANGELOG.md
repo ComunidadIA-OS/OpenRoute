@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
+## [Sin publicar]
+
+### Cambiado
+
+- El motor busca por número de vueltas y no por tiempo: con la misma entrada da siempre el mismo plan, en cualquier ordenador.
+- El motor hace 16 arranques independientes con aceptación «récord a récord» y se queda con el mejor plan. Los resultados son más estables entre ejecuciones.
+
 ## [0.1.0] - 2026-11-10
 
 Primera versión de la app de escritorio. Sustituye al prototipo del hackathon de mayo de 2026 (Next.js, FastAPI y Ollama en Docker), que sigue en el historial de git.

@@ -21,9 +21,10 @@ El coste en euros: kilómetros por el coste por kilómetro de cada vehículo, m�
 
 1. **Construcción por inserción con arrepentimiento (regret-2).** Primero se colocan los pedidos de prioridad alta. Dentro de cada prioridad, va antes el pedido que más perdería si no se coloca ya en su mejor sitio.
 2. **Búsqueda local.** 2-opt dentro de cada ruta, mover un pedido a otra posición o ruta, e intercambiar pedidos entre rutas, mientras alguno de estos cambios mejore.
-3. **Destrucción y reconstrucción (LNS).** Hasta agotar el tiempo, quita entre un 10 % y un 30 % de pedidos cercanos entre sí, los vuelve a insertar y se queda con el mejor plan. Acepta empeoramientos pequeños al principio para salir de óptimos locales.
+3. **Destrucción y reconstrucción (LNS).** Quita entre un 10 % y un 30 % de pedidos cercanos entre sí y los vuelve a insertar. Acepta un plan si no empeora más de un pequeño margen el mejor encontrado (aceptación «récord a récord»), y ese margen se cierra vuelta a vuelta.
+4. **Varios arranques.** Repite todo lo anterior 16 veces con semillas distintas y se queda con el mejor plan.
 
-El tiempo de cálculo se adapta al tamaño: entre 2,5 y 10 segundos. Con la misma entrada y la misma semilla, la construcción y la búsqueda local dan siempre el mismo resultado.
+El motor cuenta en **vueltas**, no en segundos: con la misma entrada da siempre el mismo plan, en cualquier ordenador. Por defecto hace 100 vueltas por pedido (entre 1.600 y 4.000 en total), unos 2,5 segundos con 30 pedidos. Hay un tope de seguridad de 20 segundos para listas muy grandes; solo si se alcanza, el resultado depende de la velocidad del equipo.
 
 ## Distancias
 
@@ -44,13 +45,13 @@ Este plan no comprueba la capacidad ni las franjas, así que puede sobrecargar u
 
 ## Con los pedidos de ejemplo
 
-30 pedidos en Alicante y Elche, tres furgonetas y distancias por calles de OSRM (10 de noviembre de 2026):
+30 pedidos en Alicante y Elche, tres furgonetas y distancias por calles del servidor público de OSRM (medido el 12 de noviembre de 2026; si cambia el mapa de OSRM, pueden variar algunas décimas):
 
 | | Plan manual por zonas | Motor de OpenRoute |
 |---|---|---|
-| Kilómetros | 169,0 | 166,8 |
-| Coste | 37,71 € | 30,69 € |
+| Kilómetros | 169,0 | 169,3 |
+| Coste | 37,71 € | 31,08 € |
 | Furgonetas sobrecargadas | 1 | 0 |
 | Retrasos | 0 | 0 |
 
-Los kilómetros apenas cambian porque los pedidos están en dos núcleos separados (Alicante y Elche) y hay que ir a los dos de todas formas. El ahorro está en el coste, al cargar más la furgoneta eléctrica, y en que el plan se puede ejecutar: el manual mete en una furgoneta más kilos de los que admite.
+Los kilómetros son prácticamente los mismos porque los pedidos están en dos núcleos separados (Alicante y Elche) y hay que ir a los dos de todas formas. El ahorro está en el coste, un 18 % menos, al dar más trabajo a la furgoneta eléctrica, y en que el plan se puede ejecutar: el manual mete en una furgoneta más kilos de los que admite.
