@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { parseOrdersCsv, parseOrdersTable, parsePriority, parseTime } from './import'
 
 describe('parseOrdersCsv', () => {
+  it('reconoce el BOM y los finales de línea de los CSV de Windows', () => {
+    const { columns, orders } = parseOrdersCsv('\uFEFFPedido;Dirección\r\nA1;Calle Mayor\r\nA2;Plaza Nueva\r\n')
+    expect(columns.id).toBe('Pedido')
+    expect(orders.map(({ id }) => id)).toEqual(['A1', 'A2'])
+  })
+
   it('mantiene una celda entrecomillada con salto de línea y separador', () => {
     const result = parseOrdersCsv('id;dirección;notas\nA1;Calle Mayor;"Timbre; recepción\nSegundo piso"')
     expect(result.errors).toEqual([])
