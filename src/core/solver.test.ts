@@ -215,3 +215,21 @@ it('deja sin asignar un pedido cuyo regreso supera el final del turno', () => {
   expect(result.routes[0].stops).toEqual([])
   expect(result.unassigned.map((item) => item.orderId)).toEqual(['A'])
 })
+
+it('retrasa la salida para llegar al abrir la primera franja', () => {
+  const orders = [order('A', 38.27, -0.69, { windowStart: '10:00' })]
+  const matrix = fixedMatrix(
+    [
+      [0, 1000],
+      [1000, 0]
+    ],
+    [
+      [0, 15],
+      [15, 0]
+    ]
+  )
+  const [route] = evaluateAssignment({ depot, orders, matrix, vehicles: [van('V')] }, { V: ['A'] })
+  expect(route.startMin).toBe(toMinutes('09:45'))
+  expect(route.stops[0].arrival).toBe(toMinutes('10:00'))
+  expect(route.stops[0].waitMin).toBe(0)
+})
