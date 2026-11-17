@@ -65,6 +65,9 @@ function createWindow(): void {
     }
   })
 
+  win.on('closed', () => {
+    win = null
+  })
   win.on('ready-to-show', () => win?.show())
 
   // Los enlaces externos se abren en el navegador, nunca dentro de la app.
@@ -82,20 +85,30 @@ function createWindow(): void {
   win.loadURL(devUrl ?? appUrl)
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('es.openroute.app')
-  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
-  serveRenderer()
-  store.load()
-  registerIpc(() => win)
-  createWindow()
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+// Una sola instancia escribe el archivo de pedidos y sesiones del usuario.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (win?.isMinimized()) win.restore()
+    win?.show()
+    win?.focus()
   })
-})
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('es.openroute.app')
+    app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
+    serveRenderer()
+    store.load()
+    registerIpc(() => win)
+    createWindow()
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
+  })
 
-app.on('before-quit', () => store.flush())
+  app.on('before-quit', () => store.flush())
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}
