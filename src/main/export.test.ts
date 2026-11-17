@@ -111,6 +111,13 @@ describe('planCsv', () => {
 })
 
 describe('planPdf', () => {
+  it('imprime un mensaje útil si el plan no tiene paradas ni exclusiones', async () => {
+    await planPdf({ ...session, plan: { ...session.plan!, routes: [] } })
+    const html = decodeURIComponent(loadURL.mock.lastCall![0])
+    expect(html).toContain('<h1>Hojas de ruta</h1>')
+    expect(html).toContain('El plan no contiene paradas.')
+  })
+
   it('conserva los decimales de peso de la parada y de la ruta', async () => {
     await planPdf(session)
     const html = decodeURIComponent(loadURL.mock.lastCall![0])
