@@ -6,7 +6,23 @@ import icon from '../../resources/icon.png?asset'
 import { registerIpc } from './ipc'
 import { store } from './store'
 
+const appHost = 'openroute'
+const appUrl = `app://${appHost}/index.html`
+const devUrl = is.dev ? process.env['ELECTRON_RENDERER_URL'] : undefined
+const devOrigin = devUrl ? new URL(devUrl).origin : undefined
+
 let win: BrowserWindow | null = null
+
+function isAppUrl(url: URL): boolean {
+  return url.protocol === 'app:' && url.host === appHost && !url.username && !url.password
+}
+
+function isAllowedNavigation(target: string): boolean {
+  const url = URL.parse(target)
+  if (!url || url.username || url.password) return false
+  if (isAppUrl(url)) return true
+  return (url.protocol === 'http:' || url.protocol === 'https:') && url.origin === devOrigin
+}
 
 // La interfaz se sirve con un protocolo propio (app://) en lugar de file://:
 // así los workers del mapa funcionan y la CSP tiene un origen claro.
@@ -17,14 +33,14 @@ protocol.registerSchemesAsPrivileged([
 function serveRenderer(): void {
   const root = normalize(join(__dirname, '../renderer'))
   protocol.handle('app', (req) => {
-    const { pathname } = new URL(req.url)
+    const url = new URL(req.url)
+    if (!isAppUrl(url)) return new Response('No encontrado', { status: 404 })
+    const { pathname } = url
     const file = normalize(join(root, decodeURIComponent(pathname === '/' ? '/index.html' : pathname)))
     if (!file.startsWith(root + sep)) return new Response('No encontrado', { status: 404 })
     return net.fetch(pathToFileURL(file).toString())
   })
 }
-
-const devUrl = is.dev ? process.env['ELECTRON_RENDERER_URL'] : undefined
 
 function createWindow(): void {
   win = new BrowserWindow({
@@ -43,7 +59,7 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
+      sandbox: true,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -57,12 +73,13 @@ function createWindow(): void {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e, url) => {
-    const own = url.startsWith('app://') || (devUrl !== undefined && url.startsWith(devUrl))
-    if (!own) e.preventDefault()
+    if (!isAllowedNavigation(url)) e.preventDefault()
+  })
+  win.webContents.on('will-redirect', (e, url) => {
+    if (!isAllowedNavigation(url)) e.preventDefault()
   })
 
-  if (devUrl) win.loadURL(devUrl)
-  else win.loadURL('app://openroute/index.html')
+  win.loadURL(devUrl ?? appUrl)
 }
 
 app.whenReady().then(() => {
