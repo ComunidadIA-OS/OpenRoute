@@ -425,7 +425,8 @@ export function solve(input: SolveInput): SolveResult {
   const deadline = t0 + (input.timeLimitMs ?? 30_000)
   const iterations = input.iterations ?? defaultIterations(input.orders.length)
   const restarts = Math.max(1, input.restarts ?? DEFAULT_RESTARTS)
-  const perRun = Math.ceil(iterations / restarts)
+  const perRun = Math.floor(iterations / restarts)
+  const extraRuns = iterations % restarts
   const baseSeed = input.seed ?? 7
 
   let best: State | null = null
@@ -434,6 +435,7 @@ export function solve(input: SolveInput): SolveResult {
   // Varios arranques independientes con semillas distintas; gana el mejor.
   for (let r = 0; r < restarts && Date.now() < deadline; r++) {
     const random = rng(baseSeed + r * 7919)
+    const rounds = perRun + Number(r < extraRuns)
     const current = initialState(ctx)
     recreate(ctx, current)
     localSearch(ctx, current, deadline)
@@ -444,13 +446,13 @@ export function solve(input: SolveInput): SolveResult {
     // un plan si no empeora más de un margen el mejor de este arranque, y el
     // margen se cierra vuelta a vuelta. Se cuenta en vueltas, no en segundos,
     // para que el resultado no dependa de la velocidad del ordenador.
-    for (let it = 0; it < perRun && ctx.orders.length > 2 && Date.now() < deadline; it++, done++) {
+    for (let it = 0; it < rounds && ctx.orders.length > 2 && Date.now() < deadline; it++, done++) {
       const cand = clone(run)
       ruin(ctx, cand, random)
       recreate(ctx, cand)
       localSearch(ctx, cand, deadline)
       const c = totalCost(ctx, cand)
-      const margin = 0.03 * (1 - it / perRun)
+      const margin = 0.03 * (1 - it / rounds)
       if (c < runBestCost * (1 + margin)) run = cand
       if (c < runBestCost - 1e-9) {
         runBest = clone(cand)

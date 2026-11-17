@@ -149,3 +149,10 @@ it('devuelve los pedidos pendientes al vencer el plazo antes de arrancar', () =>
   expect(result.unassigned.map((pending) => pending.orderId)).toEqual(['A'])
   expect(result.iterations).toBe(0)
 })
+
+it('cumple un presupuesto de vueltas no divisible entre los arranques', () => {
+  const orders = ['A', 'B', 'C'].map((id) => order(id, 38.27, -0.69))
+  const matrix = haversineMatrix([depot, ...orders])
+  const result = solve({ depot, orders, matrix, vehicles: [van('V')], restarts: 3, iterations: 5 })
+  expect(result.iterations).toBe(5)
+})
