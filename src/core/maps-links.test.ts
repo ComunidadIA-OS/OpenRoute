@@ -5,6 +5,16 @@ const depot = { lat: 38.27, lng: -0.69 }
 const stops = (n: number) => Array.from({ length: n }, (_, i) => ({ lat: 38.2 + i / 100, lng: -0.7 }))
 
 describe('googleMapsLegs', () => {
+  it('abre un tramo de regreso al superar en una parada el límite del enlace', () => {
+    expect(googleMapsLegs(depot, stops(MAX_WAYPOINTS))).toHaveLength(1)
+    const links = googleMapsLegs(depot, stops(MAX_WAYPOINTS + 1))
+    expect(links).toHaveLength(2)
+    const [ida, vuelta] = links.map((link) => new URL(link).searchParams)
+    expect(vuelta.get('origin')).toBe(ida.get('destination'))
+    expect(vuelta.get('destination')).toBe(ida.get('origin'))
+    expect(vuelta.has('waypoints')).toBe(false)
+  })
+
   it('termina en la última entrega si el conductor no vuelve al depósito', () => {
     const [link] = googleMapsLegs(depot, stops(1), false)
     const params = new URL(link).searchParams
