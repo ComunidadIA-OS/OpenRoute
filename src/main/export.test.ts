@@ -111,6 +111,13 @@ describe('planCsv', () => {
 })
 
 describe('planPdf', () => {
+  it('cierra la ventana auxiliar también cuando Chromium no puede imprimir', async () => {
+    destroy.mockClear()
+    printToPDF.mockRejectedValueOnce(new Error('No se pudo imprimir'))
+    await expect(planPdf(session)).rejects.toThrow('No se pudo imprimir')
+    expect(destroy).toHaveBeenCalledOnce()
+  })
+
   it('imprime un mensaje útil si el plan no tiene paradas ni exclusiones', async () => {
     await planPdf({ ...session, plan: { ...session.plan!, routes: [] } })
     const html = decodeURIComponent(loadURL.mock.lastCall![0])
