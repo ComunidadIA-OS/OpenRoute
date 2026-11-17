@@ -45,6 +45,10 @@ function run(orders: LocatedOrder[], vehicles: Vehicle[], iterations = 200) {
   return solve({ depot, vehicles, orders, matrix, iterations })
 }
 
+function fixedMatrix(distanceM: number[][], durationMin: number[][]) {
+  return { distanceM, durationS: durationMin.map((row) => row.map((minutes) => minutes * 60)), source: 'osrm' as const }
+}
+
 function sampleOrders(): LocatedOrder[] {
   const csv = readFileSync(join(__dirname, '../../resources/samples/pedidos-alicante-elche.csv'), 'utf8')
   return parseOrdersCsv(csv).orders as LocatedOrder[]
@@ -174,4 +178,22 @@ it('informa que falta flota también en pedidos con peso', () => {
   const result = run([order('A', 38.27, -0.69)], [])
   expect(result.unassigned).toEqual([{ orderId: 'A', reason: 'No hay vehículos disponibles.' }])
   expect(result.totals.vehiclesUsed).toBe(0)
+})
+
+it('suma los trayectos dirigidos de ida y vuelta al depósito', () => {
+  const orders = [order('A', 38.27, -0.69)]
+  const matrix = fixedMatrix(
+    [
+      [0, 2500],
+      [3500, 0]
+    ],
+    [
+      [0, 5],
+      [9, 0]
+    ]
+  )
+  const [route] = evaluateAssignment({ depot, orders, matrix, vehicles: [van('V')], serviceMin: 2 }, { V: ['A'] })
+  expect(route.distanceKm).toBe(6)
+  expect(route.durationMin).toBe(16)
+  expect(route.endMin - route.stops[0].departure).toBe(9)
 })
