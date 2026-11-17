@@ -5,6 +5,14 @@ const depot = { lat: 38.27, lng: -0.69 }
 const stops = (n: number) => Array.from({ length: n }, (_, i) => ({ lat: 38.2 + i / 100, lng: -0.7 }))
 
 describe('googleMapsLegs', () => {
+  it('termina en la última entrega si el conductor no vuelve al depósito', () => {
+    const [link] = googleMapsLegs(depot, stops(1), false)
+    const params = new URL(link).searchParams
+    expect(params.get('destination')).toBe('38.200000,-0.700000')
+    expect(params.has('waypoints')).toBe(false)
+    expect(params.get('travelmode')).toBe('driving')
+  })
+
   it('una ruta corta cabe en un solo enlace', () => {
     const links = googleMapsLegs(depot, stops(3))
     expect(links).toHaveLength(1)
