@@ -1,5 +1,5 @@
-// Distancias y trazados por calles con OSRM. Si el servidor no responde, se
-// usa la estimación en línea recta con factor de rodeo (ver core/geo.ts).
+// Distancias y trazados por calles con OSRM. Para trayectos sin datos de OSRM
+// se usa la estimación en línea recta con factor de rodeo (ver core/geo.ts).
 
 import { haversineMatrix } from '../../core/geo'
 import type { LatLng, TravelMatrix } from '../../core/types'
@@ -36,6 +36,7 @@ export async function travelMatrix(base: string, points: LatLng[]): Promise<Trav
   try {
     const distanceM = fallback.distanceM.map((r) => [...r])
     const durationS = fallback.durationS.map((r) => [...r])
+    let paresOsrm = 0
     const half = Math.floor(MAX_TABLE / 2)
     const chunks: number[][] = []
     const step = n <= MAX_TABLE ? n : half
@@ -48,15 +49,25 @@ export async function travelMatrix(base: string, points: LatLng[]): Promise<Trav
             const d = res.distances?.[a]?.[b]
             const t = res.durations?.[a]?.[b]
             // Si OSRM no encuentra ruta entre dos puntos, se mantiene la estimación.
-            if (typeof d === 'number' && typeof t === 'number') {
+            if (
+              i !== j &&
+              typeof d === 'number' &&
+              Number.isFinite(d) &&
+              d >= 0 &&
+              typeof t === 'number' &&
+              Number.isFinite(t) &&
+              t >= 0
+            ) {
               distanceM[i][j] = d
               durationS[i][j] = t
+              paresOsrm++
             }
           })
         )
       }
     }
-    return { distanceM, durationS, source: 'osrm' }
+    if (paresOsrm === 0) return fallback
+    return { distanceM, durationS, source: paresOsrm === n * (n - 1) ? 'osrm' : 'mixed' }
   } catch {
     return fallback
   }

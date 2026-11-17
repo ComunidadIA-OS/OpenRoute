@@ -55,7 +55,7 @@ export type LocatedOrder = Order & LatLng
 export interface TravelMatrix {
   distanceM: number[][]
   durationS: number[][]
-  source: 'osrm' | 'haversine'
+  source: 'osrm' | 'haversine' | 'mixed'
 }
 
 export interface Stop {

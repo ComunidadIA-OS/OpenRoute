@@ -17,6 +17,11 @@ import { createModel } from './providers'
 type Emit = (e: ChatEvent) => void
 
 const PRIORITY: Record<Priority, string> = { 3: 'alta', 2: 'media', 1: 'baja' }
+const ORIGEN_DISTANCIAS = {
+  osrm: 'por calles (OSRM)',
+  mixed: 'por calles (OSRM), con tramos estimados para cubrir trayectos sin datos del motor de rutas',
+  haversine: 'estimadas a partir de la distancia en línea recta para todos los trayectos'
+}
 const km = (n: number): string => `${n.toFixed(1).replace('.', ',')} km`
 const eur = (n: number): string => `${n.toFixed(2).replace('.', ',')} €`
 const pct = (a: number, b: number): string => (b > 0 ? `${Math.round(((b - a) / b) * 100)} %` : '0 %')
@@ -79,7 +84,7 @@ function planSummary(session: Session): Record<string, unknown> | null {
           sobrecargas_manual: plan.baseline.overloadedRoutes
         }
       : null,
-    distancias: plan.matrixSource === 'osrm' ? 'por calles (OSRM)' : 'estimadas en línea recta (sin motor de rutas)'
+    distancias: ORIGEN_DISTANCIAS[plan.matrixSource] ?? ORIGEN_DISTANCIAS.haversine
   }
 }
 

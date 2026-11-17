@@ -249,10 +249,13 @@ export function RoutesPanel() {
           <span className="text-[13px] text-tx-3">{formatDuration(plan.totals.durationMin)}</span>
         </div>
         {base && base.distanceKm > 0 && <Savings plan={plan} />}
-        {plan.matrixSource === 'haversine' && (
+        {plan.matrixSource === 'mixed' && (
           <div className="mt-2 text-[11.5px] text-amber">
-            Distancias estimadas: no había conexión con el motor de rutas.
+            Distancias por calles con estimaciones para trayectos sin datos del motor de rutas.
           </div>
+        )}
+        {plan.matrixSource === 'haversine' && (
+          <div className="mt-2 text-[11.5px] text-amber">Distancias estimadas para todos los trayectos.</div>
         )}
       </div>
 
