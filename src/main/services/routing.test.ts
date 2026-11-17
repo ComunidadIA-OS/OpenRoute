@@ -12,6 +12,35 @@ const points = [
 const server = 'https://rutas.example'
 
 describe('travelMatrix', () => {
+  it('combina bloques de hasta cien coordenadas conservando la dirección de cada par', async () => {
+    vi.mocked(fetchJson).mockClear()
+    const muchosPuntos = Array.from({ length: 101 }, (_, i) => ({ lat: 38, lng: i }))
+    vi.mocked(fetchJson).mockImplementation(async <T>(address: string): Promise<T> => {
+      const url = new URL(address)
+      const coordenadas = url.pathname
+        .split('/')
+        .at(-1)!
+        .split(';')
+        .map((pair) => Number(pair.split(',')[0]))
+      expect(coordenadas.length).toBeLessThanOrEqual(100)
+      const indices = (key: string) => url.searchParams.get(key)!.split(';').map(Number)
+      const matriz = indices('sources').map((i) =>
+        indices('destinations').map((j) => coordenadas[i] * 1000 + coordenadas[j])
+      )
+      return { code: 'Ok', distances: matriz, durations: matriz } as T
+    })
+    try {
+      const matriz = await travelMatrix(server, muchosPuntos)
+      expect(matriz.source).toBe('osrm')
+      expect(matriz.distanceM[85][22]).toBe(85022)
+      expect(matriz.distanceM[22][85]).toBe(22085)
+      expect(matriz.distanceM[0][100]).toBe(100)
+      expect(fetchJson).toHaveBeenCalledTimes(9)
+    } finally {
+      vi.mocked(fetchJson).mockReset()
+    }
+  })
+
   it('usa la estimación local sin hacer peticiones cuando la URL está vacía', async () => {
     vi.mocked(fetchJson).mockClear()
     expect(await travelMatrix('', points)).toEqual(haversineMatrix(points))
