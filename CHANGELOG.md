@@ -2,6 +2,13 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
+## Pendiente de publicar
+
+- Los cambios de pedidos, flota y depósito invalidan los planes afectados antes de exportarlos.
+- CSV y Excel conservan identificadores únicos y respetan las horas de las celdas de Excel.
+- Las hojas PDF incluyen los pedidos sin asignar y su motivo. El CSV protege los campos que una hoja de cálculo interpretaría como fórmulas.
+- La interfaz de escritorio se ejecuta en el sandbox de Electron. La publicación para Windows verifica el editor y el sello de tiempo del instalador y genera su SHA-256.
+
 ## [0.1.1] - 2026-11-12
 
 ### Cambiado
