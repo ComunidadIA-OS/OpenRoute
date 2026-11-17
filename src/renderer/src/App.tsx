@@ -1,5 +1,5 @@
 import { LoaderCircle, Map as MapIcon, PanelLeftOpen, Table2, Truck } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Chat } from './components/Chat'
 import { EmptyState } from './components/EmptyState'
 import { FleetView } from './components/FleetView'
@@ -17,33 +17,51 @@ const TABS: { id: View; label: string; icon: typeof MapIcon }[] = [
   { id: 'fleet', label: 'Flota', icon: Truck }
 ]
 
-function SessionTitle() {
-  const active = useUi((s) => s.app?.active)
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState('')
-  if (!active) return null
-  return editing ? (
+function SessionTitle({ id, title }: { id: string; title: string }) {
+  const [value, setValue] = useState<string | null>(null)
+  const restoreFocus = useRef(false)
+  const toast = useUi((s) => s.toast)
+
+  function finish(save: boolean, keyboard = false): void {
+    restoreFocus.current = keyboard
+    setValue(null)
+    const name = value?.trim()
+    if (save && name && name !== title) {
+      void api.renameSession(id, name).catch(() => toast('No se pudo renombrar el reparto.', 'error'))
+    }
+  }
+
+  return value !== null ? (
     <input
       autoFocus
+      aria-label="Nombre del reparto"
+      maxLength={80}
       value={value}
       onChange={(e) => setValue(e.target.value)}
-      onBlur={() => {
-        setEditing(false)
-        api.renameSession(active.id, value)
+      onBlur={() => finish(true)}
+      onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return
+        if (e.key === 'Enter' || e.key === 'Escape') {
+          e.preventDefault()
+          finish(e.key === 'Enter', true)
+        }
       }}
-      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-      className="no-drag w-[300px] rounded-md bg-bg-2 px-2 py-0.5 text-[13px] outline-none"
+      className="no-drag w-[300px] rounded-md bg-bg-2 px-2 py-0.5 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-ac"
     />
   ) : (
     <button
-      onDoubleClick={() => {
-        setValue(active.title)
-        setEditing(true)
+      type="button"
+      ref={(button) => {
+        if (button && restoreFocus.current) {
+          restoreFocus.current = false
+          button.focus()
+        }
       }}
-      className="no-drag max-w-[360px] truncate text-[13px] font-medium text-tx"
-      title="Doble clic para renombrar"
+      onClick={() => setValue(title)}
+      className="no-drag max-w-[360px] truncate text-[13px] font-medium text-tx focus-visible:outline-ac"
+      aria-label={`Renombrar reparto: ${title}`}
     >
-      {active.title}
+      {title}
     </button>
   )
 }
@@ -89,17 +107,62 @@ function Toasts() {
 export function App() {
   const { app, view, setView, sidebarOpen, toggleSidebar, setApp, applyChat } = useUi()
 
-  useEffect(() => {
-    api.getState().then(setApp)
-    const off1 = api.onState(setApp)
-    const off2 = api.onChat(applyChat)
-    return () => {
-      off1()
-      off2()
-    }
-  }, [setApp, applyChat])
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loadAttempt, setLoadAttempt] = useState(0)
 
-  if (!app) return <div className="h-full bg-bg" />
+  useEffect(() => {
+    let active = true
+    let stateReceived = false
+    const offState = api?.onState((state) => {
+      stateReceived = true
+      setApp(state)
+    })
+    const offChat = api?.onChat(applyChat)
+    void (async () => {
+      try {
+        const state = await api.getState()
+        if (active && !stateReceived) setApp(state)
+      } catch {
+        if (active && !stateReceived) setLoadFailed(true)
+      }
+    })()
+
+    return () => {
+      active = false
+      offState?.()
+      offChat?.()
+    }
+  }, [setApp, applyChat, loadAttempt])
+
+  if (!app) {
+    return (
+      <main className="grain flex h-full items-center justify-center bg-bg p-6 text-center">
+        {loadFailed ? (
+          <div>
+            <h1 role="alert" className="text-base font-medium text-tx">
+              No se pudo abrir OpenRoute.
+            </h1>
+            <button
+              type="button"
+              onClick={() => {
+                setLoadFailed(false)
+                setLoadAttempt((attempt) => attempt + 1)
+              }}
+              className="mt-4 rounded-lg border border-line-2 bg-bg-2 px-3 py-1.5 text-sm text-tx hover:bg-bg-3 focus-visible:outline-ac"
+            >
+              Reintentar
+            </button>
+          </div>
+        ) : (
+          <p role="status" className="flex items-center gap-2 text-sm text-tx-2">
+            <LoaderCircle aria-hidden="true" size={16} className="animate-spin text-ac" />
+            Abriendo OpenRoute…
+          </p>
+        )}
+      </main>
+    )
+  }
+
   const session = app.active
   const isWin = navigator.userAgent.includes('Windows')
 
@@ -122,7 +185,7 @@ export function App() {
               <PanelLeftOpen size={15} />
             </button>
           )}
-          <SessionTitle />
+          {session && <SessionTitle key={session.id} id={session.id} title={session.title} />}
           <span className="text-[12px] text-tx-3">{session?.orders.length ?? 0} pedidos</span>
           <nav className="ml-auto flex items-center gap-0.5 rounded-lg border border-line bg-bg-1 p-0.5">
             {TABS.map((t) => (
