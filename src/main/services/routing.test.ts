@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { haversineMatrix } from '../../core/geo'
 import { fetchJson } from './http'
-import { travelMatrix } from './routing'
+import { routeGeometry, travelMatrix } from './routing'
 
 vi.mock('./http', () => ({ fetchJson: vi.fn() }))
 
@@ -10,6 +10,28 @@ const points = [
   { lat: 38.4, lng: -0.5 }
 ]
 const server = 'https://rutas.example'
+
+describe('routeGeometry', () => {
+  it('une los tramos OSRM por su punto común sin repetirlo en el mapa', async () => {
+    const path = Array.from({ length: 101 }, (_, i) => ({ lat: 38, lng: i }))
+    const primerTramo = [
+      [0, 38],
+      [99, 38]
+    ]
+    const ultimoTramo = [
+      [99, 38],
+      [100, 38]
+    ]
+    vi.mocked(fetchJson)
+      .mockResolvedValueOnce({ code: 'Ok', routes: [{ geometry: { coordinates: primerTramo } }] })
+      .mockResolvedValueOnce({ code: 'Ok', routes: [{ geometry: { coordinates: ultimoTramo } }] })
+    expect(await routeGeometry(server, path)).toEqual([
+      [0, 38],
+      [99, 38],
+      [100, 38]
+    ])
+  })
+})
 
 describe('travelMatrix', () => {
   it('combina bloques de hasta cien coordenadas conservando la dirección de cada par', async () => {
