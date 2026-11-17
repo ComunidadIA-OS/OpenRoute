@@ -301,3 +301,11 @@ it('calcula coste y emisiones con las tarifas de cada vehículo', () => {
   expect(diesel).toMatchObject({ distanceKm: 10, costEur: 3, co2Kg: 2.5 })
   expect(electric).toMatchObject({ distanceKm: 10, costEur: 1, co2Kg: 0.4 })
 })
+
+it('conserva las rutas vacías sin contar su vehículo como usado', () => {
+  const { routes, totals } = run([order('A', 38.27, -0.7)], [van('A'), van('B')])
+  const active = routes.find((route) => route.stops.length > 0)
+  expect(routes).toHaveLength(2)
+  expect(active).toBeDefined()
+  expect(totals).toMatchObject({ vehiclesUsed: 1, durationMin: active?.durationMin, distanceKm: active?.distanceKm })
+})
