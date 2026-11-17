@@ -233,3 +233,22 @@ it('retrasa la salida para llegar al abrir la primera franja', () => {
   expect(route.stops[0].arrival).toBe(toMinutes('10:00'))
   expect(route.stops[0].waitMin).toBe(0)
 })
+
+it('separa hora de llegada, espera y servicio personalizado', () => {
+  const orders = [order('A', 38.27, -0.69), order('B', 38.27, -0.69, { windowStart: '09:00', serviceMin: 12 })]
+  const matrix = fixedMatrix(
+    [
+      [0, 1000, 2000],
+      [1000, 0, 1000],
+      [2000, 1000, 0]
+    ],
+    [
+      [0, 5, 10],
+      [5, 0, 5],
+      [10, 5, 0]
+    ]
+  )
+  const [route] = evaluateAssignment({ depot, orders, matrix, vehicles: [van('V')], serviceMin: 3 }, { V: ['A', 'B'] })
+  expect(route.stops[0].departure).toBe(toMinutes('08:03'))
+  expect(route.stops[1]).toMatchObject({ arrival: toMinutes('08:08'), waitMin: 52, departure: toMinutes('09:12') })
+})
