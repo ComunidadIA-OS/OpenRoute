@@ -211,12 +211,12 @@ function buildTools(session: Session) {
         if (!v) return { summary: `No encuentro el vehículo «${vehicle}»`, error: 'vehículo no encontrado' }
         if (start && !isTime(start)) return { summary: 'Hora de inicio no válida', error: start }
         if (end && !isTime(end)) return { summary: 'Hora de fin no válida', error: end }
-        store.mutate(() => {
+        store.mutate((d) => {
           if (available !== undefined) v.available = available
           if (start) v.start = start
           if (end) v.end = end
           if (capacityKg) v.capacityKg = capacityKg
-          invalidatePlan(session)
+          d.sessions.forEach(invalidatePlan)
         })
         return {
           summary: `${v.id} actualizado`,

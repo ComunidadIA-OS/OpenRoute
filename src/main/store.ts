@@ -98,6 +98,27 @@ class Store extends EventEmitter {
     } else {
       this.data = fresh
     }
+    // Una versión anterior podía dejar referencias obsoletas en planes aprobados.
+    const vehicleIds = new Set(this.data.vehicles.map((v) => v.id))
+    for (const session of this.data.sessions) {
+      if (!session.plan) continue
+      const locatedIds = new Set(
+        session.orders.filter((o) => o.lat !== undefined && o.lng !== undefined).map((o) => o.id)
+      )
+      const plannedIds = new Set([
+        ...session.plan.routes.flatMap((r) => r.stops.map((stop) => stop.orderId)),
+        ...session.plan.unassigned.map((order) => order.orderId)
+      ])
+      if (
+        plannedIds.size !== session.orders.length ||
+        session.orders.some((order) => !plannedIds.has(order.id)) ||
+        session.plan.routes.some(
+          (r) => !vehicleIds.has(r.vehicleId) || r.stops.some((stop) => !locatedIds.has(stop.orderId))
+        )
+      ) {
+        session.plan = null
+      }
+    }
     if (this.data.sessions.length === 0) {
       const s = emptySession()
       this.data.sessions.push(s)

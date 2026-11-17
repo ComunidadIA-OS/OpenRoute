@@ -24,20 +24,34 @@ function samplePath(): string {
   return join(base, 'samples', 'pedidos-alicante-elche.csv')
 }
 
-function applyImport(result: ImportResult, file?: string): ImportReport {
+function applyImport(result: ImportResult, file: string, sample = false): ImportReport {
+  const report = { added: result.orders.length, errors: result.errors, warnings: result.warnings, file }
+  if (!result.orders.length) return report
+
   const s = store.active()
-  store.mutate(() => {
+  store.mutate((d) => {
+    if (sample) {
+      if (!d.depot || d.vehicles.length === 0) d.sessions.forEach(invalidatePlan)
+      if (!d.depot) d.depot = { ...SAMPLE_DEPOT }
+      if (d.vehicles.length === 0) d.vehicles = SAMPLE_VEHICLES.map((v) => ({ ...v }))
+      s.orders = []
+    }
     const existing = new Set(s.orders.map((o) => o.id))
     for (const o of result.orders) {
-      let id = o.id
-      while (existing.has(id)) id = `${o.id}-${newId().slice(-3)}`
+      const id = uniqueOrderId(o.id, existing)
       existing.add(id)
       s.orders.push({ ...o, id })
     }
     invalidatePlan(s)
     store.touch(s)
   })
-  return { added: result.orders.length, errors: result.errors, warnings: result.warnings, ...(file ? { file } : {}) }
+  return report
+}
+
+function uniqueOrderId(base: string, existing: Set<string>): string {
+  let id = base
+  for (let suffix = 2; existing.has(id); suffix++) id = `${base}-${suffix}`
+  return id
 }
 
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
@@ -101,19 +115,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return applyImport(result, basename(file))
   })
 
-  handle('orders:sample', () => {
-    store.mutate((d) => {
-      if (!d.depot) d.depot = { ...SAMPLE_DEPOT }
-      if (d.vehicles.length === 0) d.vehicles = SAMPLE_VEHICLES.map((v) => ({ ...v }))
-    })
-    const s = store.active()
-    if (s.orders.length) store.mutate(() => void (s.orders = []))
-    return applyImport(parseOrdersCsv(readFileSync(samplePath(), 'utf8')), 'pedidos-alicante-elche.csv')
-  })
+  handle('orders:sample', () =>
+    applyImport(parseOrdersCsv(readFileSync(samplePath(), 'utf8')), 'pedidos-alicante-elche.csv', true)
+  )
   handle('orders:add', (o: Omit<Order, 'id'> & { id?: string }) => {
     const s = store.active()
+    const base = o.id?.trim() || `P-${newId().slice(-5)}`
+    const id = uniqueOrderId(base, new Set(s.orders.map((order) => order.id)))
     store.mutate(() => {
-      s.orders.push({ ...o, id: o.id?.trim() || `P-${newId().slice(-5)}` } as Order)
+      s.orders.push({ ...o, id })
       invalidatePlan(s)
       store.touch(s)
     })
@@ -167,13 +177,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       const i = d.vehicles.findIndex((x) => x.id === v.id)
       if (i >= 0) d.vehicles[i] = v
       else d.vehicles.push(v)
-      invalidatePlan(store.active())
+      d.sessions.forEach(invalidatePlan)
     })
   })
   handle('vehicle:delete', (id: string) => {
     store.mutate((d) => {
       d.vehicles = d.vehicles.filter((v) => v.id !== id)
-      invalidatePlan(store.active())
+      d.sessions.forEach(invalidatePlan)
     })
   })
 

@@ -11,6 +11,17 @@ import { newId, store, type Session } from './store'
 
 const matrixCache = new Map<string, { key: string; matrix: TravelMatrix }>()
 
+function planInputsKey(session: Session): string {
+  const { depot, vehicles, settings } = store.state
+  return JSON.stringify([session.orders, depot, vehicles, settings.osrmUrl, settings.serviceMin])
+}
+
+function ensurePlanInputs(session: Session, key: string, previousPlan: Plan | null): void {
+  if (store.session(session.id) !== session || planInputsKey(session) !== key || session.plan !== previousPlan) {
+    throw new Error('El reparto cambió durante el cálculo. Vuelve a calcular las rutas.')
+  }
+}
+
 const pointsKey = (pts: LatLng[]): string => pts.map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join(';')
 
 /** Busca coordenadas para los pedidos que no las tienen. Devuelve los que no se encontraron. */
@@ -22,7 +33,11 @@ export async function locateOrders(session: Session): Promise<string[]> {
   for (let k = 0; k < missing.length; k++) {
     const o = missing[k]
     setBusy({ stage: 'geocoding', label: `Buscando direcciones`, done: k, total: missing.length })
-    const hit = await geocode(o.address, countryCodes, near)
+    const address = o.address
+    const hit = await geocode(address, countryCodes, near)
+    if (o.address !== address || !session.orders.includes(o) || store.session(session.id) !== session) {
+      throw new Error('Los pedidos cambiaron mientras se buscaban direcciones. Vuelve a calcular las rutas.')
+    }
     if (hit) {
       store.mutate(() => {
         o.lat = hit.lat
@@ -72,8 +87,17 @@ export async function planSession(session: Session): Promise<Plan> {
   if (session.orders.length === 0) throw new Error('No hay pedidos. Importa un CSV o carga el ejemplo.')
 
   try {
+    const previousPlan = session.plan
     const notFound = await locateOrders(session)
     const orders = located(session)
+    const inputsKey = planInputsKey(session)
+    if (
+      depot !== store.state.depot ||
+      vehicles.some((v) => !store.state.vehicles.includes(v)) ||
+      vehicles.length !== store.state.vehicles.filter((v) => v.available).length
+    ) {
+      throw new Error('La flota cambió durante el cálculo. Vuelve a calcular las rutas.')
+    }
     if (orders.length === 0) throw new Error('No se ha podido ubicar ningún pedido en el mapa.')
 
     setBusy({ stage: 'matrix', label: 'Calculando distancias por calles' })
@@ -105,6 +129,7 @@ export async function planSession(session: Session): Promise<Plan> {
       serviceMin
     }
     await attachGeometry(plan, orders)
+    ensurePlanInputs(session, inputsKey, previousPlan)
     store.mutate(() => {
       session.plan = plan
       store.touch(session)
@@ -141,6 +166,7 @@ export async function moveOrder(
   const at = position === undefined ? target.length : Math.max(0, Math.min(target.length, position))
   target.splice(at, 0, orderId)
 
+  const inputsKey = planInputsKey(session)
   const matrix = await matrixFor(session, [depot, ...orders])
   const routes = evaluateAssignment({ depot, vehicles, orders, matrix, serviceMin: plan.serviceMin }, assignment)
   const prevGeometry = new Map(plan.routes.map((r) => [r.vehicleId, r]))
@@ -159,6 +185,8 @@ export async function moveOrder(
   }
   await attachGeometry({ ...next, routes: routes.filter((r) => changed.has(r.vehicleId)) }, orders)
   setBusy(null)
+  ensurePlanInputs(session, inputsKey, plan)
+  if (plan.status !== 'draft') throw new Error('El plan está aprobado. Reábrelo para cambiarlo.')
   store.mutate(() => {
     session.plan = next
     store.touch(session)
@@ -172,5 +200,5 @@ export async function moveOrder(
 
 /** Invalida el plan cuando cambian los pedidos o la flota. */
 export function invalidatePlan(session: Session): void {
-  if (session.plan && session.plan.status !== 'approved') session.plan = null
+  session.plan = null
 }
