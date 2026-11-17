@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { parseOrdersCsv, parseOrdersTable, parsePriority, parseTime } from './import'
 
 describe('parseOrdersCsv', () => {
+  it('lee el formato numérico inglés y advierte sobre agrupaciones inválidas', () => {
+    const { orders, warnings } = parseOrdersCsv(
+      'order_id,address,weight_kg\nP1,High Street,"1,234.50"\nP2,High Street,"1,,23.45"'
+    )
+    expect(orders.map(({ weightKg }) => weightKg)).toEqual([1234.5, 0])
+    expect(warnings).toEqual([{ row: 3, message: 'Peso no válido «1,,23.45»: se usa 0 kg.' }])
+  })
+
   it('señala la fila con coordenadas imposibles aunque incluya dirección', () => {
     const { orders, errors } = parseOrdersCsv('id;dirección;lat;lon\nP1;Calle Mayor;38;-181\nP2;Plaza;38;-0.5')
     expect(orders.map(({ id }) => id)).toEqual(['P2'])

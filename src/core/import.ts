@@ -77,8 +77,12 @@ function parseNumber(value: unknown): number | null {
   if (typeof value !== 'string') return null
   const s = value.trim().replace(/\s/g, '')
   if (s === '') return null
-  // «1.234,5» -> 1234.5 ; «15,5» -> 15.5
-  const cleaned = s.includes(',') && s.includes('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(',', '.')
+  let cleaned = s.replace(',', '.')
+  if (s.includes(',') && s.includes('.')) {
+    if (/^[+-]?\d{1,3}(\.\d{3})+,\d+(e[+-]?\d+)?$/i.test(s)) cleaned = s.replace(/\./g, '').replace(',', '.')
+    else if (/^[+-]?\d{1,3}(,\d{3})+\.\d+(e[+-]?\d+)?$/i.test(s)) cleaned = s.replace(/,/g, '')
+    else return null
+  }
   const n = Number(cleaned)
   return Number.isFinite(n) ? n : null
 }
