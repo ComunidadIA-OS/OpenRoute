@@ -66,6 +66,28 @@ const session: Session = {
 }
 
 describe('planCsv', () => {
+  it('mantiene el id y el motivo de un pedido sin ruta ni datos de contacto', () => {
+    const csv = planCsv({
+      ...session,
+      orders: [],
+      plan: {
+        ...session.plan!,
+        routes: [],
+        unassigned: [{ orderId: 'P9', reason: 'Sin vehículo; capacidad insuficiente' }]
+      }
+    })
+    const { data } = Papa.parse(csv, { header: true, delimiter: ';' })
+    expect(data).toEqual([
+      expect.objectContaining({
+        id_pedido: 'P9',
+        vehiculo: '',
+        cliente: '',
+        llegada: '',
+        retraso: 'sin asignar: Sin vehículo; capacidad insuficiente'
+      })
+    ])
+  })
+
   it('conserva acentos y separadores y exporta texto que podría interpretarse como fórmula', () => {
     const csv = planCsv(session)
     expect(csv.startsWith('\uFEFF')).toBe(true)
