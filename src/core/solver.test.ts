@@ -156,3 +156,16 @@ it('cumple un presupuesto de vueltas no divisible entre los arranques', () => {
   const result = solve({ depot, orders, matrix, vehicles: [van('V')], restarts: 3, iterations: 5 })
   expect(result.iterations).toBe(5)
 })
+
+it('rechaza filas que no cubren todos los puntos de viaje', () => {
+  const orders = [order('A', 38.27, -0.69)]
+  const matrix = {
+    distanceM: [
+      [0, 100],
+      [100, 0]
+    ],
+    durationS: [[0, 60], [60]],
+    source: 'osrm' as const
+  }
+  expect(() => solve({ depot, orders, matrix, vehicles: [van('V')] })).toThrow('La matriz debe ser de 2×2')
+})

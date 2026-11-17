@@ -76,7 +76,8 @@ export interface Simulation {
 function buildCtx(input: SolveInput): Ctx {
   const serviceMin = input.serviceMin ?? DEFAULT_SERVICE_MIN
   const n = input.orders.length + 1
-  if (input.matrix.distanceM.length !== n || input.matrix.durationS.length !== n) {
+  const validMatrix = (rows: number[][]): boolean => rows.length === n && rows.every((row) => row.length === n)
+  if (!validMatrix(input.matrix.distanceM) || !validMatrix(input.matrix.durationS)) {
     throw new Error(`La matriz debe ser de ${n}×${n} (depósito + ${n - 1} pedidos).`)
   }
   return {
