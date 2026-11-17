@@ -39,6 +39,12 @@ describe('parseOrdersCsv', () => {
     expect(warnings).toHaveLength(1)
   })
 
+  it('busca otro sufijo si el id generado ya existe', () => {
+    const { orders, warnings } = parseOrdersCsv('id,direccion\nA,Calle 1\nA-4,Calle 2\nA,Calle 3')
+    expect(orders.map((o) => o.id)).toEqual(['A', 'A-4', 'A-4-2'])
+    expect(warnings).toHaveLength(1)
+  })
+
   it('pide una columna de dirección o coordenadas', () => {
     const { errors } = parseOrdersCsv('id,cliente\n1,Bar')
     expect(errors[0].message).toMatch(/dirección/)

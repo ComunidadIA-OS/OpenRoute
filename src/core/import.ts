@@ -154,12 +154,12 @@ export function rowsToOrders(rows: Record<string, unknown>[], headers: string[])
 
     let id = text(get('id')) || `P-${String(idx + 1).padStart(3, '0')}`
     if (seen.has(id)) {
-      const fresh = `${id}-${row}`
+      const base = `${id}-${row}`
+      let fresh = base
+      for (let suffix = 2; seen.has(fresh); suffix++) fresh = `${base}-${suffix}`
       warnings.push({ row, message: `Id repetido «${id}»: se guarda como «${fresh}».` })
       id = fresh
     }
-    seen.add(id)
-
     const weightRaw = parseNumber(get('weight'))
     if (cols.weight && weightRaw === null && text(get('weight')) !== '') {
       warnings.push({ row, message: `Peso no válido «${text(get('weight'))}»: se usa 0 kg.` })
@@ -181,6 +181,7 @@ export function rowsToOrders(rows: Record<string, unknown>[], headers: string[])
       return
     }
 
+    seen.add(id)
     const service = parseNumber(get('service'))
     orders.push({
       id,
