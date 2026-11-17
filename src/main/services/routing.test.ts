@@ -12,6 +12,26 @@ const points = [
 const server = 'https://rutas.example'
 
 describe('routeGeometry', () => {
+  it('dibuja todos los puntos del reparto si OSRM no puede completar el trazado', async () => {
+    const path = Array.from({ length: 101 }, (_, i) => ({ lat: 38, lng: i }))
+    vi.mocked(fetchJson)
+      .mockResolvedValueOnce({
+        code: 'Ok',
+        routes: [
+          {
+            geometry: {
+              coordinates: [
+                [0, 38],
+                [99, 38]
+              ]
+            }
+          }
+        ]
+      })
+      .mockResolvedValueOnce({ code: 'NoRoute' })
+    expect(await routeGeometry(server, path)).toEqual(path.map(({ lng, lat }) => [lng, lat]))
+  })
+
   it('une los tramos OSRM por su punto común sin repetirlo en el mapa', async () => {
     const path = Array.from({ length: 101 }, (_, i) => ({ lat: 38, lng: i }))
     const primerTramo = [
