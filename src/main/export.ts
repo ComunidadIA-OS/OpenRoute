@@ -1,4 +1,4 @@
-// Hojas de ruta en PDF (una página por conductor) y plan en CSV.
+// Hojas de ruta en PDF (una sección por conductor) y plan en CSV.
 
 import { BrowserWindow } from 'electron'
 import Papa from 'papaparse'
@@ -13,7 +13,8 @@ const esc = (s: unknown): string =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   )
 
-const num = (n: number, d = 1): string => n.toFixed(d).replace('.', ',')
+const num = (n: number): string => n.toFixed(1).replace('.', ',')
+const weight = new Intl.NumberFormat('es-ES', { useGrouping: false, maximumFractionDigits: 6 })
 
 export function planCsv(session: Session): string {
   const plan = session.plan
@@ -88,7 +89,7 @@ function sheetsHtml(session: Session): string {
       <li><b>${r.stops.length}</b> paradas</li>
       <li><b>${num(r.distanceKm)} km</b></li>
       <li>Salida <b>${toHHMM(r.startMin)}</b> · regreso <b>${toHHMM(r.endMin)}</b> (${formatDuration(r.durationMin)})</li>
-      <li>Carga <b>${Math.round(r.loadKg)} kg</b> de ${v?.capacityKg ?? '?'} kg</li>
+      <li>Carga <b>${weight.format(r.loadKg)} kg</b> de ${v ? weight.format(v.capacityKg) : '?'} kg</li>
     </ul>
   </header>
   <table>
@@ -97,7 +98,7 @@ function sheetsHtml(session: Session): string {
       ${r.stops
         .map((s, k) => {
           const o = byId.get(s.orderId)!
-          return `<tr${s.late ? ' class="late"' : ''}><td>${k + 1}</td><td><b>${toHHMM(s.arrival + s.waitMin)}</b></td><td>${esc(o.customer)}<small>${esc(o.id)}</small></td><td>${esc(o.address)}</td><td>${o.windowStart}-${o.windowEnd}</td><td>${num(o.weightKg, 0)}</td><td>${esc(o.notes ?? '')}</td><td class="sign"></td></tr>`
+          return `<tr${s.late ? ' class="late"' : ''}><td>${k + 1}</td><td><b>${toHHMM(s.arrival + s.waitMin)}</b></td><td>${esc(o.customer)}<small>${esc(o.id)}</small></td><td>${esc(o.address)}</td><td>${esc(o.windowStart)}-${esc(o.windowEnd)}</td><td>${weight.format(o.weightKg)}</td><td>${esc(o.notes ?? '')}</td><td class="sign"></td></tr>`
         })
         .join('')}
     </tbody>
@@ -105,6 +106,16 @@ function sheetsHtml(session: Session): string {
   <footer>${links.map((l, k) => `<p>Google Maps${links.length > 1 ? ` (tramo ${k + 1})` : ''}: <a href="${esc(l)}">${esc(l)}</a></p>`).join('')}</footer>
 </section>`
     })
+  if (plan.unassigned.length > 0 || pages.length === 0) {
+    const rows = plan.unassigned.map(({ orderId, reason }) => {
+      const order = byId.get(orderId)
+      return `<tr><td>${esc(order?.customer)}<small>${esc(orderId)}</small></td><td>${esc(order?.address)}</td><td>${esc(reason)}</td></tr>`
+    })
+    pages.push(`<section>
+  <header><div class="brand">OpenRoute</div><h1>${rows.length ? 'Pedidos sin asignar' : 'Hojas de ruta'}</h1><p>${esc(session.title)}</p></header>
+  ${rows.length ? `<table><thead><tr><th>Cliente</th><th>Dirección</th><th>Motivo</th></tr></thead><tbody>${rows.join('')}</tbody></table>` : '<p>El plan no contiene paradas.</p>'}
+</section>`)
+  }
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>
   @page { size: A4; margin: 14mm; }
   body { font-family: "Segoe UI", system-ui, sans-serif; color: #0b100e; font-size: 10.5px; }
@@ -116,8 +127,10 @@ function sheetsHtml(session: Session): string {
   header p { margin: 0 0 8px; color: #445; }
   .kpis { display: flex; gap: 18px; padding: 0; list-style: none; margin: 0 0 12px; color: #334; }
   table { width: 100%; border-collapse: collapse; }
+  thead { display: table-header-group; }
+  tr { break-inside: avoid; }
   th { text-align: left; font-weight: 600; color: #556; border-bottom: 1.5px solid #0b100e; padding: 5px 4px; }
-  td { border-bottom: 1px solid #dde3df; padding: 6px 4px; vertical-align: top; }
+  td { border-bottom: 1px solid #dde3df; padding: 6px 4px; vertical-align: top; overflow-wrap: anywhere; }
   td small { display: block; color: #889; }
   tr.late td { background: #fff1ec; }
   td.sign { width: 90px; }

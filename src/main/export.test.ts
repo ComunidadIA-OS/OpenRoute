@@ -1,10 +1,22 @@
 import Papa from 'papaparse'
 import { describe, expect, it, vi } from 'vitest'
-import { planCsv } from './export'
+import { planCsv, planPdf } from './export'
 import type { Session } from './store'
 
-vi.mock('electron', () => ({ BrowserWindow: vi.fn() }))
-vi.mock('./store', () => ({ store: { state: {} } }))
+const { loadURL, printToPDF, destroy } = vi.hoisted(() => ({
+  loadURL: vi.fn<(url: string) => Promise<void>>().mockResolvedValue(undefined),
+  printToPDF: vi.fn().mockResolvedValue(Buffer.from('%PDF')),
+  destroy: vi.fn()
+}))
+
+vi.mock('electron', () => ({
+  BrowserWindow: class {
+    loadURL = loadURL
+    webContents = { printToPDF }
+    destroy = destroy
+  }
+}))
+vi.mock('./store', () => ({ store: { state: { depot: { lat: 38.3, lng: -0.5 }, vehicles: [] } } }))
 
 const session: Session = {
   id: 'sesión',
@@ -18,6 +30,8 @@ const session: Session = {
       id: 'A',
       customer: '  =1+1',
       address: 'Calle "Mayor"; 2\rLocal',
+      lat: 38.4,
+      lng: -0.4,
       priority: 2,
       weightKg: 2.5,
       windowStart: '09:00',
@@ -71,5 +85,27 @@ describe('planCsv', () => {
         retraso: 'no'
       }
     ])
+  })
+})
+
+describe('planPdf', () => {
+  it('conserva los decimales de peso de la parada y de la ruta', async () => {
+    await planPdf(session)
+    const html = decodeURIComponent(loadURL.mock.lastCall![0])
+    expect(html).toContain('<b>2,5 kg</b>')
+    expect(html).toContain('<td>2,5</td>')
+    expect(printToPDF).toHaveBeenCalledWith({ pageSize: 'A4', printBackground: true })
+    expect(destroy).toHaveBeenCalled()
+  })
+
+  it('muestra los motivos de los pedidos sin asignar aunque no haya rutas', async () => {
+    await planPdf({
+      ...session,
+      plan: { ...session.plan!, routes: [], unassigned: [{ orderId: 'A', reason: 'Capacidad < 2,5 kg' }] }
+    })
+    const html = decodeURIComponent(loadURL.mock.lastCall![0])
+    expect(html).toContain('<h1>Pedidos sin asignar</h1>')
+    expect(html).toContain('<small>A</small>')
+    expect(html).toContain('Capacidad &lt; 2,5 kg')
   })
 })
