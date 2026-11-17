@@ -1,6 +1,7 @@
 // Hojas de ruta en PDF (una página por conductor) y plan en CSV.
 
 import { BrowserWindow } from 'electron'
+import Papa from 'papaparse'
 import { googleMapsLegs } from '../core/maps-links'
 import { formatDuration, toHHMM } from '../core/time'
 import type { Order } from '../core/types'
@@ -64,10 +65,7 @@ export function planCsv(session: Session): string {
       `sin asignar: ${u.reason}`
     ])
   }
-  return (
-    '\uFEFF' +
-    rows.map((r) => r.map((c) => (/[",;\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(';')).join('\r\n')
-  )
+  return '\uFEFF' + Papa.unparse(rows, { delimiter: ';', escapeFormulae: /^(?:[\t\r\n]|\s*[=+\-@])/ })
 }
 
 function sheetsHtml(session: Session): string {
