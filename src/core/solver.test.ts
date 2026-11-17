@@ -270,3 +270,11 @@ it('considera puntual llegar justo al cierre de la franja', () => {
   expect(result.routes[0].stops[0]).toMatchObject({ arrival: toMinutes('08:10'), late: false, lateMin: 0 })
   expect(result.unassigned).toEqual([])
 })
+
+it('rechaza referencias de pedidos desconocidos al evaluar una ruta', () => {
+  const orders = [order('A', 38.27, -0.69)]
+  const matrix = haversineMatrix([depot, ...orders])
+  expect(() => evaluateAssignment({ depot, orders, matrix, vehicles: [van('V')] }, { V: ['borrado'] })).toThrow(
+    'Pedido desconocido: borrado'
+  )
+})
