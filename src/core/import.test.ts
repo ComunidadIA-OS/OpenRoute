@@ -59,6 +59,25 @@ describe('parseOrdersTable', () => {
     ])
     expect(orders[0]).toMatchObject({ windowStart: '09:00', windowEnd: '12:00' })
   })
+
+  it('lee las horas con formato de Excel en UTC sin aplicar la zona del ordenador', () => {
+    const inicio = new Date('1899-12-30T09:15:00.000Z')
+    const fin = new Date('1899-12-30T12:45:00.000Z')
+    const { orders } = parseOrdersTable([
+      ['id', 'direccion', 'desde', 'hasta'],
+      ['1', 'Calle 1', inicio, fin]
+    ])
+    expect(orders[0]).toMatchObject({ windowStart: '09:15', windowEnd: '12:45' })
+  })
+
+  it('conserva la primera columna cuando una cabecera está repetida', () => {
+    const { orders } = parseOrdersTable([
+      ['id', 'dirección', 'dirección'],
+      ['1', 'Calle 1', 'Calle 2'],
+      ['2', 'Calle 3', null]
+    ])
+    expect(orders.map((o) => o.address)).toEqual(['Calle 1', 'Calle 3'])
+  })
 })
 
 describe('parsers', () => {
@@ -71,5 +90,10 @@ describe('parsers', () => {
     expect(parseTime('9')).toBe('09:00')
     expect(parseTime('9.30')).toBe('09:30')
     expect(parseTime('25:00')).toBeNull()
+    expect(parseTime('9:30:99')).toBeNull()
+    expect(parseTime(new Date(NaN))).toBeNull()
+    expect(parseTime(0.99999)).toBe('23:59')
+    expect(parseTime(24)).toBeNull()
+    expect(parseTime('24')).toBeNull()
   })
 })

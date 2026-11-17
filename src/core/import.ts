@@ -94,19 +94,22 @@ export function parsePriority(value: unknown): Priority {
 
 export function parseTime(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null
-  if (value instanceof Date) return toHHMM(value.getHours() * 60 + value.getMinutes())
+  if (value instanceof Date) {
+    // read-excel-file representa las horas de la hoja en UTC.
+    return Number.isNaN(value.getTime()) ? null : toHHMM(value.getUTCHours() * 60 + value.getUTCMinutes())
+  }
   if (typeof value === 'number') {
     // Excel guarda las horas como fracción del día (0,375 = 09:00).
-    if (value >= 0 && value < 1) return toHHMM(Math.round(value * 24 * 60))
-    if (value >= 0 && value <= 24) return toHHMM(Math.round(value * 60))
+    if (value >= 0 && value < 1) return toHHMM(Math.min(1439, Math.round(value * 24 * 60)))
+    if (value >= 1 && value < 24) return toHHMM(Math.min(1439, Math.round(value * 60)))
     return null
   }
   const s = String(value).trim().toLowerCase().replace(/h$/, '').replace('.', ':')
   if (/^\d{1,2}$/.test(s)) {
     const h = Number(s)
-    return h <= 24 ? toHHMM(h * 60) : null
+    return h < 24 ? toHHMM(h * 60) : null
   }
-  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) {
+  if (/^\d{1,2}:\d{2}(:[0-5]\d)?$/.test(s)) {
     const hhmm = s.split(':').slice(0, 2).join(':')
     return isTime(hhmm) ? toHHMM(toMinutes(hhmm)) : null
   }
@@ -219,6 +222,12 @@ export function parseOrdersTable(table: unknown[][]): ImportResult {
   if (table.length === 0)
     return { orders: [], errors: [{ row: 1, message: 'El archivo está vacío.' }], warnings: [], columns: {} }
   const headers = table[0].map((h) => text(h))
-  const rows = table.slice(1).map((cells) => Object.fromEntries(headers.map((h, i) => [h, cells[i]])))
+  const columns = new Map<string, number>()
+  headers.forEach((header, index) => {
+    if (header && !columns.has(header)) columns.set(header, index)
+  })
+  const rows = table
+    .slice(1)
+    .map((cells) => Object.fromEntries([...columns].map(([header, index]) => [header, cells[index]])))
   return rowsToOrders(rows, headers)
 }
