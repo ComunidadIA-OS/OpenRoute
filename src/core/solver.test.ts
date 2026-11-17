@@ -278,3 +278,26 @@ it('rechaza referencias de pedidos desconocidos al evaluar una ruta', () => {
     'Pedido desconocido: borrado'
   )
 })
+
+it('calcula coste y emisiones con las tarifas de cada vehículo', () => {
+  const orders = ['A', 'B'].map((id) => order(id, 38.27, -0.69))
+  const matrix = fixedMatrix(
+    [
+      [0, 5000, 5000],
+      [5000, 0, 0],
+      [5000, 0, 0]
+    ],
+    [
+      [0, 5, 5],
+      [5, 0, 0],
+      [5, 0, 0]
+    ]
+  )
+  const vehicles = [van('Diesel', { costPerKm: 0.3 }), van('Electrico', { costPerKm: 0.1, electric: true })]
+  const [diesel, electric] = evaluateAssignment(
+    { depot, orders, matrix, vehicles },
+    { Diesel: ['A'], Electrico: ['B'] }
+  )
+  expect(diesel).toMatchObject({ distanceKm: 10, costEur: 3, co2Kg: 2.5 })
+  expect(electric).toMatchObject({ distanceKm: 10, costEur: 1, co2Kg: 0.4 })
+})
