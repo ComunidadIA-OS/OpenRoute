@@ -140,3 +140,12 @@ describe('evaluateAssignment', () => {
     expect(route.lateStops).toBe(1)
   })
 })
+
+it('devuelve los pedidos pendientes al vencer el plazo antes de arrancar', () => {
+  const orders = [order('A', 38.27, -0.69)]
+  const matrix = haversineMatrix([depot, ...orders])
+  const result = solve({ depot, orders, matrix, vehicles: [van('V')], timeLimitMs: 0 })
+  expect(result.routes[0].stops).toEqual([])
+  expect(result.unassigned.map((pending) => pending.orderId)).toEqual(['A'])
+  expect(result.iterations).toBe(0)
+})

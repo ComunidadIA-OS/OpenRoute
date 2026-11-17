@@ -194,6 +194,14 @@ function totalCost(ctx: Ctx, s: State): number {
   return c
 }
 
+function initialState(ctx: Ctx): State {
+  return {
+    routes: ctx.vehicles.map(() => []),
+    costs: ctx.vehicles.map(() => 0),
+    unrouted: new Set(ctx.orders.map((_, i) => i))
+  }
+}
+
 function clone(s: State): State {
   return { routes: s.routes.map((r) => [...r]), costs: [...s.costs], unrouted: new Set(s.unrouted) }
 }
@@ -426,11 +434,7 @@ export function solve(input: SolveInput): SolveResult {
   // Varios arranques independientes con semillas distintas; gana el mejor.
   for (let r = 0; r < restarts && Date.now() < deadline; r++) {
     const random = rng(baseSeed + r * 7919)
-    const current: State = {
-      routes: ctx.vehicles.map(() => []),
-      costs: ctx.vehicles.map(() => 0),
-      unrouted: new Set(ctx.orders.map((_, i) => i))
-    }
+    const current = initialState(ctx)
     recreate(ctx, current)
     localSearch(ctx, current, deadline)
     let run = current
@@ -459,7 +463,7 @@ export function solve(input: SolveInput): SolveResult {
     }
   }
 
-  const final = best!
+  const final = best ?? initialState(ctx)
   const routes = final.routes.map((seq, v) => toRoute(ctx, v, seq))
   const unassigned = [...final.unrouted]
     .sort((a, b) => a - b)
