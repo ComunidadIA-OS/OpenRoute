@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { parseOrdersCsv, parseOrdersTable, parsePriority, parseTime } from './import'
 
 describe('parseOrdersCsv', () => {
+  it('señala la fila con coordenadas imposibles aunque incluya dirección', () => {
+    const { orders, errors } = parseOrdersCsv('id;dirección;lat;lon\nP1;Calle Mayor;38;-181\nP2;Plaza;38;-0.5')
+    expect(orders.map(({ id }) => id)).toEqual(['P2'])
+    expect(errors).toEqual([{ row: 2, message: 'Coordenadas fuera de rango (38, -181).' }])
+  })
+
   it('entiende pesos con miles y coordenadas negativas con coma decimal', () => {
     const { orders } = parseOrdersCsv('id;latitud;longitud;peso_kg\nP1;38,35;-0,49;1.234,50')
     expect(orders[0]).toMatchObject({ lat: 38.35, lng: -0.49, weightKg: 1234.5 })
