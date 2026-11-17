@@ -62,7 +62,7 @@ Las claves se cifran con el almacén seguro del sistema (DPAPI en Windows, Keych
 
 ## Empezar en un minuto
 
-1. [Descarga el instalador](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe) y ábrelo. Windows puede avisar de que el instalador no está firmado: pulsa «Más información» y «Ejecutar de todas formas».
+1. [Descarga el instalador de Windows](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe). En las versiones firmadas puedes comprobar quién lo publicó en **Propiedades → Firmas digitales** y comparar su SHA-256 con el que aparece en la página de la versión. La versión 0.1.1 se publicó sin firma. Si Windows bloquea el archivo, espera una versión firmada o [compila la app desde el código](#desarrollo).
 2. Pulsa **Probar con un ejemplo**: carga 30 pedidos de ejemplo en Alicante y Elche y una flota de tres furgonetas.
 3. Pulsa **Calcular rutas**.
 4. Si quieres hablar con el planificador, abre **Ajustes**, elige un proveedor y pega tu clave.
@@ -96,9 +96,15 @@ npm run dev
 | `npm test` | Pruebas del motor, la importación y los enlaces |
 | `npm run typecheck` | Comprobación de tipos |
 | `npm run lint` | ESLint y Prettier |
-| `npm run dist:win` | Genera `dist/OpenRoute-Setup.exe` |
+| `npm run dist:win` | Genera `dist/OpenRoute-Setup.exe` para pruebas locales |
 
 En macOS y Linux, `npx electron-builder --mac` o `--linux` después de `npm run build`.
+
+### Publicar para Windows
+
+El flujo de GitHub Actions firma el instalador y la aplicación con Microsoft Artifact Signing. Configura el entorno `windows-release` para permitir etiquetas de publicación y vincula su identidad federada (`repo:ComunidadIA-OS/OpenRoute:environment:windows-release`) a una aplicación de Microsoft Entra con permiso de firma sobre el perfil público. Consulta la [guía de integración de Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations) y la [configuración de OIDC en GitHub Actions](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure).
+
+Define las variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `WINDOWS_SIGNING_ENDPOINT`, `WINDOWS_SIGNING_ACCOUNT`, `WINDOWS_SIGNING_PROFILE` y `WINDOWS_SIGNING_PUBLISHER` en ese entorno. Usa como editor el nombre común (CN) exacto del certificado del perfil. La etiqueta `vX.Y.Z` debe coincidir con la versión en `package.json`. El flujo publica `OpenRoute-Setup.exe` y `OpenRoute-Setup.exe.sha256` después de verificar el editor, las firmas y los sellos de tiempo. SmartScreen todavía puede advertir sobre versiones recientes mientras adquieren reputación. Consulta la [documentación de SmartScreen](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation).
 
 ### Estructura
 

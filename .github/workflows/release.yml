@@ -1,17 +1,21 @@
 name: Release
 
-# Al subir una etiqueta vX.Y.Z se genera el instalador de Windows y se
+# Al subir una etiqueta vX.Y.Z se firma el instalador de Windows y se
 # publica en la release de esa versión.
 on:
   push:
     tags: ['v*']
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   windows:
     runs-on: windows-latest
+    environment: windows-release
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,7 +24,61 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
-      - run: npm run dist:win
+      - name: Comprobar versión y configuración de firma
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+          SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ($env:GITHUB_REF_NAME -cne "v$version") {
+            throw "La etiqueta debe ser v$version para coincidir con package.json."
+          }
+          foreach ($variable in 'SIGNING_ENDPOINT', 'SIGNING_ACCOUNT', 'SIGNING_PROFILE', 'SIGNING_PUBLISHER') {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variable))) {
+              throw "Falta configurar $variable en el entorno windows-release."
+            }
+          }
+      - name: Autenticar la identidad de firma
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Empaquetar y firmar el instalador
+        shell: pwsh
+        env:
+          SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+          SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+        run: |
+          npm run dist:win -- `
+            --config.win.forceCodeSigning=true `
+            "--config.win.azureSignOptions.endpoint=$env:SIGNING_ENDPOINT" `
+            "--config.win.azureSignOptions.codeSigningAccountName=$env:SIGNING_ACCOUNT" `
+            "--config.win.azureSignOptions.certificateProfileName=$env:SIGNING_PROFILE" `
+            "--config.win.azureSignOptions.publisherName=$env:SIGNING_PUBLISHER"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verificar firma y generar SHA-256
+        shell: pwsh
+        env:
+          SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+        run: |
+          foreach ($file in 'dist/OpenRoute-Setup.exe', 'dist/win-unpacked/OpenRoute.exe') {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne 'Valid' -or $null -eq $signature.TimeStamperCertificate) {
+              throw "Se esperaba una firma Authenticode válida con sello de tiempo en ${file}. Estado $($signature.Status)."
+            }
+            $publisher = $signature.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+            if ($publisher -cne $env:SIGNING_PUBLISHER) {
+              throw "El editor de ${file} es '$publisher'. Se esperaba '$env:SIGNING_PUBLISHER'."
+            }
+          }
+          $hash = (Get-FileHash -LiteralPath dist/OpenRoute-Setup.exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  OpenRoute-Setup.exe" | Set-Content -LiteralPath dist/OpenRoute-Setup.exe.sha256 -Encoding ascii
       - name: Publicar en la release
         shell: bash
         env:
@@ -29,7 +87,7 @@ jobs:
           TAG="${GITHUB_REF_NAME}"
           NOTES=$(awk "/^## \[${TAG#v}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/OpenRoute-Setup.exe --clobber
+            gh release upload "$TAG" dist/OpenRoute-Setup.exe dist/OpenRoute-Setup.exe.sha256
           else
-            gh release create "$TAG" dist/OpenRoute-Setup.exe --title "OpenRoute $TAG" --notes "$NOTES"
+            gh release create "$TAG" dist/OpenRoute-Setup.exe dist/OpenRoute-Setup.exe.sha256 --verify-tag --title "OpenRoute $TAG" --notes "$NOTES"
           fi
