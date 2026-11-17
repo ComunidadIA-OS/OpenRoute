@@ -12,6 +12,12 @@ const points = [
 const server = 'https://rutas.example'
 
 describe('travelMatrix', () => {
+  it('usa la estimación local sin hacer peticiones cuando la URL está vacía', async () => {
+    vi.mocked(fetchJson).mockClear()
+    expect(await travelMatrix('', points)).toEqual(haversineMatrix(points))
+    expect(fetchJson).not.toHaveBeenCalled()
+  })
+
   it('identifica las distancias y duraciones completas de OSRM, aunque falte la diagonal', async () => {
     vi.mocked(fetchJson).mockResolvedValueOnce({
       code: 'Ok',
