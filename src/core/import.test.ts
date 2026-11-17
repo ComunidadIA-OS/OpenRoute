@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { parseOrdersCsv, parseOrdersTable, parsePriority, parseTime } from './import'
 
 describe('parseOrdersCsv', () => {
+  it('mantiene una celda entrecomillada con salto de línea y separador', () => {
+    const result = parseOrdersCsv('id;dirección;notas\nA1;Calle Mayor;"Timbre; recepción\nSegundo piso"')
+    expect(result.errors).toEqual([])
+    expect(result.orders[0]?.notes).toBe('Timbre; recepción\nSegundo piso')
+  })
+
   it('entiende cabeceras en español con tildes y separador «;»', () => {
     const csv = [
       'Pedido;Cliente;Dirección;Población;Peso;Desde;Hasta;Prioridad',
