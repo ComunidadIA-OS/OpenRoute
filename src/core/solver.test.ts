@@ -169,3 +169,9 @@ it('rechaza filas que no cubren todos los puntos de viaje', () => {
   }
   expect(() => solve({ depot, orders, matrix, vehicles: [van('V')] })).toThrow('La matriz debe ser de 2×2')
 })
+
+it('informa que falta flota también en pedidos con peso', () => {
+  const result = run([order('A', 38.27, -0.69)], [])
+  expect(result.unassigned).toEqual([{ orderId: 'A', reason: 'No hay vehículos disponibles.' }])
+  expect(result.totals.vehiclesUsed).toBe(0)
+})

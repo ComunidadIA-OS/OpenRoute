@@ -410,9 +410,9 @@ export function totalsOf(routes: Route[]): PlanTotals {
 }
 
 function unassignedReason(ctx: Ctx, i: number): string {
+  if (ctx.vehicles.length === 0) return 'No hay vehículos disponibles.'
   const maxCap = Math.max(0, ...ctx.vehicles.map((v) => v.capacityKg))
   if (ctx.weight[i] > maxCap) return `Pesa ${ctx.weight[i]} kg y ningún vehículo carga tanto.`
-  if (ctx.vehicles.length === 0) return 'No hay vehículos disponibles.'
   const reachable = ctx.vehicles.some(
     (_, v) => ctx.vStart[v] + ctx.dur[0][i + 1] <= ctx.wEnd[i] && ctx.wStart[i] <= ctx.vEnd[v]
   )
