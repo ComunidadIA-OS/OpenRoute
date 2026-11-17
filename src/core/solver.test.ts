@@ -252,3 +252,21 @@ it('separa hora de llegada, espera y servicio personalizado', () => {
   expect(route.stops[0].departure).toBe(toMinutes('08:03'))
   expect(route.stops[1]).toMatchObject({ arrival: toMinutes('08:08'), waitMin: 52, departure: toMinutes('09:12') })
 })
+
+it('considera puntual llegar justo al cierre de la franja', () => {
+  const orders = [order('A', 38.27, -0.69, { windowStart: '08:00', windowEnd: '08:10' })]
+  const matrix = fixedMatrix(
+    [
+      [0, 1000],
+      [1000, 0]
+    ],
+    [
+      [0, 10],
+      [10, 0]
+    ]
+  )
+  const vehicles = [van('V', { start: '08:00' })]
+  const result = solve({ depot, orders, matrix, vehicles })
+  expect(result.routes[0].stops[0]).toMatchObject({ arrival: toMinutes('08:10'), late: false, lateMin: 0 })
+  expect(result.unassigned).toEqual([])
+})
