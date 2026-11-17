@@ -197,3 +197,21 @@ it('suma los trayectos dirigidos de ida y vuelta al depósito', () => {
   expect(route.durationMin).toBe(16)
   expect(route.endMin - route.stops[0].departure).toBe(9)
 })
+
+it('deja sin asignar un pedido cuyo regreso supera el final del turno', () => {
+  const orders = [order('A', 38.27, -0.69, { windowStart: '08:00', windowEnd: '08:05' })]
+  const matrix = fixedMatrix(
+    [
+      [0, 1000],
+      [1000, 0]
+    ],
+    [
+      [0, 5],
+      [10, 0]
+    ]
+  )
+  const vehicles = [van('V', { start: '08:00', end: '08:10' })]
+  const result = solve({ depot, orders, matrix, vehicles, serviceMin: 0 })
+  expect(result.routes[0].stops).toEqual([])
+  expect(result.unassigned.map((item) => item.orderId)).toEqual(['A'])
+})
