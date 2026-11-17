@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { parseOrdersCsv, parseOrdersTable, parsePriority, parseTime } from './import'
 
 describe('parseOrdersCsv', () => {
+  it('entiende pesos con miles y coordenadas negativas con coma decimal', () => {
+    const { orders } = parseOrdersCsv('id;latitud;longitud;peso_kg\nP1;38,35;-0,49;1.234,50')
+    expect(orders[0]).toMatchObject({ lat: 38.35, lng: -0.49, weightKg: 1234.5 })
+  })
+
   it('reconoce el BOM y los finales de línea de los CSV de Windows', () => {
     const { columns, orders } = parseOrdersCsv('\uFEFFPedido;Dirección\r\nA1;Calle Mayor\r\nA2;Plaza Nueva\r\n')
     expect(columns.id).toBe('Pedido')
