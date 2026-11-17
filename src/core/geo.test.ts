@@ -20,3 +20,17 @@ it('estima distancias en metros y tiempos en segundos para ambos sentidos', () =
   expect(matrix.distanceM[1][0]).toBeCloseTo(matrix.distanceM[0][1], 5)
   expect(matrix.durationS[1][0]).toBeCloseTo(matrix.durationS[0][1], 5)
 })
+
+it('devuelve extremos longitudinales y latitudinales en orden de mapa', () => {
+  expect(
+    bounds([
+      { lat: 9, lng: -3 },
+      { lat: -4, lng: 5 },
+      { lat: 2, lng: 1 }
+    ])
+  ).toEqual([
+    [-3, -4],
+    [5, 9]
+  ])
+  expect(bounds([])).toBeNull()
+})
