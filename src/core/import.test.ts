@@ -75,6 +75,17 @@ describe('parseOrdersCsv', () => {
 })
 
 describe('parseOrdersTable', () => {
+  it('conserva el número real de fila en Excel cuando hay una fila vacía entre pedidos', () => {
+    const { orders, errors } = parseOrdersTable([
+      ['id', 'dirección'],
+      ['P1', 'Calle Mayor'],
+      [null, null],
+      ['P2', null]
+    ])
+    expect(orders.map(({ id }) => id)).toEqual(['P1'])
+    expect(errors).toEqual([{ row: 4, message: 'Sin dirección ni coordenadas.' }])
+  })
+
   it('convierte horas de Excel (fracción del día)', () => {
     const { orders } = parseOrdersTable([
       ['id', 'direccion', 'desde', 'hasta'],
