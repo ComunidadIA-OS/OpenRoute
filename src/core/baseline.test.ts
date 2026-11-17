@@ -53,3 +53,15 @@ it('sirve primero los pedidos urgentes en el plan manual de una zona', () => {
   const result = manualBaseline({ depot, vehicles, orders, matrix, serviceMin: 15 })
   expect(result).toMatchObject({ lateStops: 1, durationMin: 30, vehiclesUsed: 1 })
 })
+
+it('limita las zonas a las ubicaciones disponibles', () => {
+  expect(
+    zones(
+      [
+        { lat: 1, lng: 2 },
+        { lat: 1, lng: -2 }
+      ],
+      5
+    )
+  ).toEqual([1, 0])
+})
