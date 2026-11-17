@@ -129,7 +129,7 @@ docs/         Documentación.
 - Zonas de bajas emisiones y vehículos eléctricos con autonomía.
 - Importación directa desde WooCommerce, Shopify y Holded.
 
-La versión gestionada para empresas, con app de conductores, seguimiento para clientes y avisos por WhatsApp, está en [openroute.es](https://openroute.es).
+Si repartes con tu propia flota, puedes [solicitar un piloto para empresas](https://openroute.es/#demo). Usamos la app de escritorio para importar un día de pedidos reales desde Excel o CSV, evaluar las rutas y ayudar a tu equipo a ponerla en marcha.
 
 ## Licencia
 
