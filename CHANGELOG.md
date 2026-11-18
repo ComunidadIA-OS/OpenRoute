@@ -2,6 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
+## [0.2.1] - 2026-11-18
+
+- La aplicación se puede usar en español e inglés. En Windows, la primera instalación recoge el idioma del enlace de descarga y Ajustes permite cambiarlo después.
+- Una preferencia de idioma guardada se conserva al actualizar.
+
 ## [0.2.0] - 2026-11-18
 
 - La guía de cuatro pasos presenta Pedidos, Flota, Mapa y Chat. Puedes omitirla o volver a abrirla desde Ayuda.
