@@ -66,6 +66,21 @@ const session: Session = {
 }
 
 describe('planCsv', () => {
+  it('exporta en inglés y conserva el formato que reconoce la importación de pedidos', () => {
+    const csv = planCsv(
+      {
+        ...session,
+        plan: { ...session.plan!, unassigned: [{ orderId: 'P2', reason: 'No hay vehículos disponibles.' }] }
+      },
+      'en'
+    )
+    const { data, errors } = Papa.parse(csv, { header: true, delimiter: ',' })
+    expect(errors).toEqual([])
+    expect(data).toEqual([
+      expect.objectContaining({ vehicle: 'F1', stop_number: '1', order_id: 'A', weight_kg: '2.5', late: 'no' }),
+      expect.objectContaining({ order_id: 'P2', late: 'unassigned: No vehicles are available.' })
+    ])
+  })
   it('mantiene el id y el motivo de un pedido sin ruta ni datos de contacto', () => {
     const csv = planCsv({
       ...session,
@@ -111,6 +126,22 @@ describe('planCsv', () => {
 })
 
 describe('planPdf', () => {
+  it('imprime las columnas, los pesos y los motivos del motor en inglés', async () => {
+    await planPdf(
+      {
+        ...session,
+        plan: { ...session.plan!, unassigned: [{ orderId: 'P2', reason: 'Pesa 50 kg y ningún vehículo carga tanto.' }] }
+      },
+      'en'
+    )
+    const html = decodeURIComponent(loadURL.mock.lastCall![0])
+    expect(html).toContain('<html lang="en">')
+    expect(html).toContain('<th>Arrival</th>')
+    expect(html).toContain('<th>Signature</th>')
+    expect(html).toContain('<b>2.5 kg</b>')
+    expect(html).toContain('<h1>Unassigned orders</h1>')
+    expect(html).toContain('The order weighs 50 kg, more than any vehicle can carry.')
+  })
   it('cierra la ventana auxiliar también cuando Chromium no puede imprimir', async () => {
     destroy.mockClear()
     printToPDF.mockRejectedValueOnce(new Error('No se pudo imprimir'))

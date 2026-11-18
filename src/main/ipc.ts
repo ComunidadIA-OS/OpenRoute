@@ -12,6 +12,7 @@ import type { ChatEvent, ImportReport, ModelRef, ProviderId, Settings } from '..
 import { sendMessage, stopChat, testModel } from './ai/agent'
 import { listModels } from './ai/providers'
 import { planCsv, planPdf } from './export'
+import { isAppLanguage } from './language'
 import { cancelGoogleSignIn, clearGoogleAccount, startGoogleSignIn } from './google-account'
 import { invalidatePlan, moveOrder, planSession } from './planner'
 import { runtime, setBusy, snapshot } from './runtime'
@@ -78,7 +79,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle('state:get', () => snapshot())
 
   handle('session:new', () => {
-    const s = emptySession()
+    const s = emptySession(store.state.settings.language)
     store.mutate((d) => {
       d.sessions.push(s)
       d.activeId = s.id
@@ -92,16 +93,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle('session:delete', (id: string) => {
     store.mutate((d) => {
       d.sessions = d.sessions.filter((s) => s.id !== id)
-      if (d.sessions.length === 0) d.sessions.push(emptySession())
+      if (d.sessions.length === 0) d.sessions.push(emptySession(d.settings.language))
       if (!d.sessions.some((s) => s.id === d.activeId)) d.activeId = d.sessions[0].id
     })
   })
 
   handle('orders:import', async () => {
     const w = getWindow()
+    const english = store.state.settings.language === 'en'
     const res = await dialog.showOpenDialog(w!, {
-      title: 'Importar pedidos',
-      filters: [{ name: 'Pedidos', extensions: ['csv', 'xlsx', 'txt'] }],
+      title: english ? 'Import orders' : 'Importar pedidos',
+      filters: [{ name: english ? 'Orders' : 'Pedidos', extensions: ['csv', 'xlsx', 'txt'] }],
       properties: ['openFile']
     })
     if (res.canceled || !res.filePaths[0]) return null
@@ -215,15 +217,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
   handle('plan:pdf', async () => {
     const s = store.active()
+    const language = store.state.settings.language
+    const english = language === 'en'
     const res = await dialog.showSaveDialog(getWindow()!, {
-      title: 'Guardar hojas de ruta',
-      defaultPath: `${s.title.replace(/[\\/:*?"<>|]/g, '')} - hojas de ruta.pdf`,
+      title: english ? 'Save route sheets' : 'Guardar hojas de ruta',
+      defaultPath: `${s.title.replace(/[\\/:*?"<>|]/g, '')} - ${english ? 'route sheets' : 'hojas de ruta'}.pdf`,
       filters: [{ name: 'PDF', extensions: ['pdf'] }]
     })
     if (res.canceled || !res.filePath) return null
     setBusy({ stage: 'exporting', label: 'Generando las hojas de ruta' })
     try {
-      writeFileSync(res.filePath, await planPdf(s))
+      writeFileSync(res.filePath, await planPdf(s, language))
     } finally {
       setBusy(null)
     }
@@ -232,13 +236,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
   handle('plan:csv', async () => {
     const s = store.active()
+    const language = store.state.settings.language
     const res = await dialog.showSaveDialog(getWindow()!, {
-      title: 'Exportar plan',
+      title: language === 'en' ? 'Export plan' : 'Exportar plan',
       defaultPath: `${s.title.replace(/[\\/:*?"<>|]/g, '')}.csv`,
       filters: [{ name: 'CSV', extensions: ['csv'] }]
     })
     if (res.canceled || !res.filePath) return null
-    writeFileSync(res.filePath, planCsv(s), 'utf8')
+    writeFileSync(res.filePath, planCsv(s, language), 'utf8')
     return res.filePath
   })
   handle('plan:links', (vehicleId: string) => {
@@ -258,8 +263,14 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle('chat:stop', () => stopChat())
 
   handle('settings:save', (patch: Partial<Omit<Settings, 'providers'>>) => {
+    if (patch.language !== undefined && !isAppLanguage(patch.language)) throw new Error('Idioma no compatible.')
     store.mutate((d) => {
-      d.settings = { ...d.settings, ...patch, providers: d.settings.providers }
+      d.settings = {
+        ...d.settings,
+        ...patch,
+        language: patch.language ?? d.settings.language,
+        providers: d.settings.providers
+      }
     })
   })
   handle('provider:save', (id: ProviderId, input: { apiKey?: string | null; baseURL?: string }) => {

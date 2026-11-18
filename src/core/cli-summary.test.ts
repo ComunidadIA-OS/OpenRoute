@@ -23,6 +23,14 @@ const plan: Plan = {
 }
 
 describe('resumen para pegar en el terminal', () => {
+  it('traduce el resumen y el formato decimal sin incluir datos privados', () => {
+    const summary = cliSummary(7, { ...plan, status: 'approved', matrixSource: 'mixed' }, 'en')
+    expect(summary).toContain('Route plan: approved.')
+    expect(summary).toContain('Unassigned orders: 1')
+    expect(summary).toContain('Total distance: 4.2 km')
+    expect(summary).toContain('OSRM with estimates for some legs')
+    expect(summary).not.toContain('privado')
+  })
   it('comunica cuándo aún no hay plan', () => {
     expect(cliSummary(4, null)).toContain('Pedidos: 4\nPlan de rutas: pendiente de calcular.')
   })

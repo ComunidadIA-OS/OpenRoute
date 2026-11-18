@@ -3,8 +3,9 @@
 import { BrowserWindow } from 'electron'
 import Papa from 'papaparse'
 import { googleMapsLegs } from '../core/maps-links'
+import { localizeUnassignedReason } from '../core/route-language'
 import { formatDuration, toHHMM } from '../core/time'
-import type { Order } from '../core/types'
+import type { AppLanguage, Order } from '../core/types'
 import { store, type Session } from './store'
 
 const esc = (s: unknown): string =>
@@ -13,15 +14,10 @@ const esc = (s: unknown): string =>
     (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!
   )
 
-const num = (n: number): string => n.toFixed(1).replace('.', ',')
-const weight = new Intl.NumberFormat('es-ES', { useGrouping: false, maximumFractionDigits: 6 })
-
-export function planCsv(session: Session): string {
-  const plan = session.plan
-  if (!plan) throw new Error('No hay plan que exportar.')
-  const byId = new Map(session.orders.map((o) => [o.id, o]))
-  const rows = [
-    [
+const copy = {
+  es: {
+    missingPlan: 'No hay plan que exportar.',
+    csv: [
       'vehiculo',
       'orden',
       'id_pedido',
@@ -32,8 +28,63 @@ export function planCsv(session: Session): string {
       'franja_fin',
       'peso_kg',
       'retraso'
-    ]
-  ]
+    ],
+    pdf: ['#', 'Llegada', 'Cliente', 'Dirección', 'Franja', 'Kg', 'Notas', 'Firma'],
+    reasonCols: ['Cliente', 'Dirección', 'Motivo'],
+    yes: 'si',
+    no: 'no',
+    unassigned: 'sin asignar',
+    driver: 'Conductor',
+    stops: 'paradas',
+    departure: 'Salida',
+    return: 'regreso',
+    load: 'Carga',
+    of: 'de',
+    leg: 'tramo',
+    unassignedOrders: 'Pedidos sin asignar',
+    routeSheets: 'Hojas de ruta',
+    noStops: 'El plan no contiene paradas.'
+  },
+  en: {
+    missingPlan: 'There is no plan to export.',
+    csv: [
+      'vehicle',
+      'stop_number',
+      'order_id',
+      'customer',
+      'address',
+      'arrival',
+      'window_start',
+      'window_end',
+      'weight_kg',
+      'late'
+    ],
+    pdf: ['#', 'Arrival', 'Customer', 'Address', 'Window', 'Kg', 'Notes', 'Signature'],
+    reasonCols: ['Customer', 'Address', 'Reason'],
+    yes: 'yes',
+    no: 'no',
+    unassigned: 'unassigned',
+    driver: 'Driver',
+    stops: 'stops',
+    departure: 'Departure',
+    return: 'return',
+    load: 'Load',
+    of: 'of',
+    leg: 'leg',
+    unassignedOrders: 'Unassigned orders',
+    routeSheets: 'Route sheets',
+    noStops: 'The plan has no stops.'
+  }
+}
+
+const headings = (labels: string[]): string => labels.map((label) => `<th>${esc(label)}</th>`).join('')
+
+export function planCsv(session: Session, language: AppLanguage = 'es'): string {
+  const t = copy[language]
+  const plan = session.plan
+  if (!plan) throw new Error(t.missingPlan)
+  const byId = new Map(session.orders.map((o) => [o.id, o]))
+  const rows = [t.csv]
   for (const r of plan.routes) {
     r.stops.forEach((s, k) => {
       const o = byId.get(s.orderId) as Order
@@ -47,7 +98,7 @@ export function planCsv(session: Session): string {
         o.windowStart,
         o.windowEnd,
         String(o.weightKg),
-        s.late ? 'si' : 'no'
+        s.late ? t.yes : t.no
       ])
     })
   }
@@ -63,13 +114,23 @@ export function planCsv(session: Session): string {
       o?.windowStart ?? '',
       o?.windowEnd ?? '',
       String(o?.weightKg ?? ''),
-      `sin asignar: ${u.reason}`
+      `${t.unassigned}: ${localizeUnassignedReason(u.reason, language)}`
     ])
   }
-  return '\uFEFF' + Papa.unparse(rows, { delimiter: ';', escapeFormulae: /^(?:[\t\r\n]|\s*[=+\-@])/ })
+  return (
+    '\uFEFF' +
+    Papa.unparse(rows, { delimiter: language === 'en' ? ',' : ';', escapeFormulae: /^(?:[\t\r\n]|\s*[=+\-@])/ })
+  )
 }
 
-function sheetsHtml(session: Session): string {
+function sheetsHtml(session: Session, language: AppLanguage): string {
+  const t = copy[language]
+  const distance = new Intl.NumberFormat(language, {
+    useGrouping: false,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  })
+  const weight = new Intl.NumberFormat(language, { useGrouping: false, maximumFractionDigits: 6 })
   const plan = session.plan!
   const depot = store.state.depot!
   const vehicles = new Map(store.state.vehicles.map((v) => [v.id, v]))
@@ -84,16 +145,16 @@ function sheetsHtml(session: Session): string {
   <header>
     <div class="brand">OpenRoute</div>
     <h1>${esc(v?.name ?? r.vehicleId)} <span>${esc(r.vehicleId)}</span></h1>
-    <p>${esc(session.title)}${v?.driver ? ` · Conductor: ${esc(v.driver)}` : ''}</p>
+    <p>${esc(session.title)}${v?.driver ? ` · ${t.driver}: ${esc(v.driver)}` : ''}</p>
     <ul class="kpis">
-      <li><b>${r.stops.length}</b> paradas</li>
-      <li><b>${num(r.distanceKm)} km</b></li>
-      <li>Salida <b>${toHHMM(r.startMin)}</b> · regreso <b>${toHHMM(r.endMin)}</b> (${formatDuration(r.durationMin)})</li>
-      <li>Carga <b>${weight.format(r.loadKg)} kg</b> de ${v ? weight.format(v.capacityKg) : '?'} kg</li>
+      <li><b>${r.stops.length}</b> ${t.stops}</li>
+      <li><b>${distance.format(r.distanceKm)} km</b></li>
+      <li>${t.departure} <b>${toHHMM(r.startMin)}</b> · ${t.return} <b>${toHHMM(r.endMin)}</b> (${formatDuration(r.durationMin)})</li>
+      <li>${t.load} <b>${weight.format(r.loadKg)} kg</b> ${t.of} ${v ? weight.format(v.capacityKg) : '?'} kg</li>
     </ul>
   </header>
   <table>
-    <thead><tr><th>#</th><th>Llegada</th><th>Cliente</th><th>Dirección</th><th>Franja</th><th>Kg</th><th>Notas</th><th>Firma</th></tr></thead>
+    <thead><tr>${headings(t.pdf)}</tr></thead>
     <tbody>
       ${r.stops
         .map((s, k) => {
@@ -103,20 +164,20 @@ function sheetsHtml(session: Session): string {
         .join('')}
     </tbody>
   </table>
-  <footer>${links.map((l, k) => `<p>Google Maps${links.length > 1 ? ` (tramo ${k + 1})` : ''}: <a href="${esc(l)}">${esc(l)}</a></p>`).join('')}</footer>
+  <footer>${links.map((l, k) => `<p>Google Maps${links.length > 1 ? ` (${t.leg} ${k + 1})` : ''}: <a href="${esc(l)}">${esc(l)}</a></p>`).join('')}</footer>
 </section>`
     })
   if (plan.unassigned.length > 0 || pages.length === 0) {
     const rows = plan.unassigned.map(({ orderId, reason }) => {
       const order = byId.get(orderId)
-      return `<tr><td>${esc(order?.customer)}<small>${esc(orderId)}</small></td><td>${esc(order?.address)}</td><td>${esc(reason)}</td></tr>`
+      return `<tr><td>${esc(order?.customer)}<small>${esc(orderId)}</small></td><td>${esc(order?.address)}</td><td>${esc(localizeUnassignedReason(reason, language))}</td></tr>`
     })
     pages.push(`<section>
-  <header><div class="brand">OpenRoute</div><h1>${rows.length ? 'Pedidos sin asignar' : 'Hojas de ruta'}</h1><p>${esc(session.title)}</p></header>
-  ${rows.length ? `<table><thead><tr><th>Cliente</th><th>Dirección</th><th>Motivo</th></tr></thead><tbody>${rows.join('')}</tbody></table>` : '<p>El plan no contiene paradas.</p>'}
+  <header><div class="brand">OpenRoute</div><h1>${rows.length ? t.unassignedOrders : t.routeSheets}</h1><p>${esc(session.title)}</p></header>
+  ${rows.length ? `<table><thead><tr>${headings(t.reasonCols)}</tr></thead><tbody>${rows.join('')}</tbody></table>` : `<p>${t.noStops}</p>`}
 </section>`)
   }
-  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><style>
+  return `<!doctype html><html lang="${language}"><head><meta charset="utf-8"><style>
   @page { size: A4; margin: 14mm; }
   body { font-family: "Segoe UI", system-ui, sans-serif; color: #0b100e; font-size: 10.5px; }
   section { page-break-after: always; }
@@ -139,11 +200,11 @@ function sheetsHtml(session: Session): string {
 </style></head><body>${pages.join('')}</body></html>`
 }
 
-export async function planPdf(session: Session): Promise<Buffer> {
-  if (!session.plan || !store.state.depot) throw new Error('No hay plan que exportar.')
+export async function planPdf(session: Session, language: AppLanguage = 'es'): Promise<Buffer> {
+  if (!session.plan || !store.state.depot) throw new Error(copy[language].missingPlan)
   const win = new BrowserWindow({ show: false, webPreferences: { offscreen: true, javascript: false } })
   try {
-    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(sheetsHtml(session))}`)
+    await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(sheetsHtml(session, language))}`)
     return await win.webContents.printToPDF({ pageSize: 'A4', printBackground: true })
   } finally {
     win.destroy()
