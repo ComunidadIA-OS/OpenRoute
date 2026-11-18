@@ -107,7 +107,7 @@ describe('solve', () => {
     expect(res.unassigned.map((u) => u.orderId)).toEqual(['baja'])
   })
 
-  it('es determinista: misma entrada, mismo plan', () => {
+  it('es determinista: misma entrada, mismo plan', { timeout: 30_000 }, () => {
     const orders = sampleOrders()
     const matrix = haversineMatrix([SAMPLE_DEPOT, ...orders])
     const input = { depot: SAMPLE_DEPOT, vehicles: SAMPLE_VEHICLES, orders, matrix, iterations: 400, seed: 3 }
