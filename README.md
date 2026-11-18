@@ -102,6 +102,12 @@ npm run dev
 
 En macOS y Linux, `npx electron-builder --mac` o `--linux` después de `npm run build`.
 
+### Publicar para macOS
+
+El entorno `macos-release` de GitHub Actions necesita los secrets `MACOS_CERTIFICATE_P12` (certificado **Developer ID Application** con clave privada, exportado como `.p12` y codificado en Base64), `MACOS_CERTIFICATE_PASSWORD` y `APPLE_API_KEY_P8` (contenido de la clave de equipo de App Store Connect). Define las variables `MACOS_TEAM_ID`, `APPLE_API_KEY_ID` y `APPLE_API_ISSUER` con los identificadores de Apple. Si incluyes el acceso con Google, añade también el secret `GOOGLE_DESKTOP_OAUTH_JSON` a este entorno. Consulta la [guía de certificados Developer ID](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) y la [guía de notarización de Apple](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution).
+
+El flujo prepara un DMG para Apple Silicon (`arm64`) y otro para Intel (`x64`). Firma y notariza por separado cada aplicación y su DMG. Antes de subir los archivos verifica el firmante, la versión, la arquitectura, los tickets de notarización y la evaluación de Gatekeeper. Los dos DMG y sus archivos SHA-256 se añaden a la publicación de la misma etiqueta una vez creado el lanzamiento de Windows.
+
 ### Publicar para Windows
 
 El flujo de GitHub Actions firma el instalador y la aplicación con Microsoft Artifact Signing. Configura el entorno `windows-release` para permitir etiquetas de publicación y vincula su identidad federada (`repo:ComunidadIA-OS/OpenRoute:environment:windows-release`) a una aplicación de Microsoft Entra con permiso de firma sobre el perfil público. Consulta la [guía de integración de Artifact Signing](https://learn.microsoft.com/en-us/azure/artifact-signing/how-to-signing-integrations) y la [configuración de OIDC en GitHub Actions](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments/oidc-in-azure).

@@ -1,7 +1,6 @@
 name: Release
 
-# Al subir una etiqueta vX.Y.Z se firma el instalador de Windows y se
-# publica en la release de esa versión.
+# Al subir una etiqueta vX.Y.Z se validan y publican los instaladores firmados.
 on:
   push:
     tags: ['v*']
@@ -107,3 +106,121 @@ jobs:
           else
             gh release create "$TAG" dist/OpenRoute-Setup.exe dist/OpenRoute-Setup.exe.sha256 --verify-tag --title "OpenRoute $TAG" --notes "$NOTES"
           fi
+
+  macos:
+    name: macOS (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 70
+    environment: macos-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Preparar el cliente de Google opcional
+        env:
+          GOOGLE_DESKTOP_OAUTH_JSON: ${{ secrets.GOOGLE_DESKTOP_OAUTH_JSON }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs'
+          const config = process.env.GOOGLE_DESKTOP_OAUTH_JSON?.trim()
+          if (config) {
+            try {
+              const installed = JSON.parse(config).installed
+              if (typeof installed?.client_id !== 'string' || !/^[a-z\d-]+\.apps\.googleusercontent\.com$/.test(installed.client_id)) throw new Error()
+              writeFileSync('resources/google-oauth.json', config)
+            } catch {
+              throw new Error('GOOGLE_DESKTOP_OAUTH_JSON debe contener un cliente OAuth de escritorio válido.')
+            }
+          }
+          NODE
+      - run: npm run build
+      - name: Firmar, notarizar y verificar el DMG
+        shell: bash
+        env:
+          ARCH: ${{ matrix.arch }}
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ vars.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ vars.APPLE_API_ISSUER }}
+          MACOS_TEAM_ID: ${{ vars.MACOS_TEAM_ID }}
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [[ "$GITHUB_REF_NAME" != "v$version" ]]; then
+            printf 'La etiqueta debe coincidir con la versión %s de package.json.\n' "$version" >&2
+            exit 1
+          fi
+          for variable in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_P8 APPLE_API_KEY_ID APPLE_API_ISSUER MACOS_TEAM_ID; do
+            if [[ -z "${!variable}" ]]; then
+              printf 'Falta configurar %s en el entorno macos-release.\n' "$variable" >&2
+              exit 1
+            fi
+          done
+          if [[ ! "$MACOS_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+            printf 'El Team ID de Apple no es válido.\n' >&2
+            exit 1
+          fi
+
+          export APPLE_API_KEY="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
+          trap 'rm -f -- "$APPLE_API_KEY"' EXIT
+          (umask 077; printf '%s' "$APPLE_API_KEY_P8" > "$APPLE_API_KEY")
+          unset APPLE_API_KEY_P8
+          npx --no-install electron-builder --mac "--$ARCH" --publish never --config.mac.forceCodeSigning=true
+
+          dmg="dist/OpenRoute-$version-$ARCH.dmg"
+          notary_result="$RUNNER_TEMP/notary-dmg.json"
+          xcrun notarytool submit "$dmg" --key "$APPLE_API_KEY" --key-id "$APPLE_API_KEY_ID" \
+            --issuer "$APPLE_API_ISSUER" --wait --timeout 30m --output-format json > "$notary_result"
+          node -e 'const r = require(process.argv[1]); console.log(`Notarización del DMG: ${r.status} (${r.id})`); if (r.status !== "Accepted") process.exitCode = 1' "$notary_result"
+          xcrun stapler staple "$dmg"
+          bash scripts/verify-macos-release.sh "$dmg" "$ARCH" "$MACOS_TEAM_ID" "$version"
+          (cd dist && shasum -a 256 "${dmg##*/}" > "${dmg##*/}.sha256")
+          printf 'DMG_PATH=%s\n' "$dmg" >> "$GITHUB_ENV"
+      - name: Guardar los archivos verificados
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            ${{ env.DMG_PATH }}
+            ${{ env.DMG_PATH }}.sha256
+          if-no-files-found: error
+
+  publicar_macos:
+    name: Publicar instaladores de macOS
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          merge-multiple: true
+          path: macos
+      - name: Confirmar integridad y añadir a la release de Windows
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd macos
+          version=${GITHUB_REF_NAME#v}
+          files=()
+          for arch in arm64 x64; do
+            dmg="OpenRoute-$version-$arch.dmg"
+            shasum -a 256 -c "$dmg.sha256"
+            files+=("$dmg" "$dmg.sha256")
+          done
+          gh release upload "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY"

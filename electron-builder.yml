@@ -35,9 +35,12 @@ mac:
   icon: build/icon.png
   category: public.app-category.business
   target: [dmg]
-  notarize: false
+  hardenedRuntime: true
+  notarize: true
 dmg:
-  artifactName: OpenRoute-${version}.${ext}
+  artifactName: OpenRoute-${version}-${arch}.${ext}
+  sign: true
+  writeUpdateInfo: false
 linux:
   icon: build/icon.png
   target: [AppImage]
