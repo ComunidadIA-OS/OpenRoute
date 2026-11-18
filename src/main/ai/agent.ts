@@ -99,7 +99,10 @@ function buildTools(session: Session) {
         const byPriority = { alta: 0, media: 0, baja: 0 }
         session.orders.forEach((o) => byPriority[PRIORITY[o.priority] as keyof typeof byPriority]++)
         return {
-          summary: ui(`${session.orders.length} pedidos, ${store.state.vehicles.length} vehículos`, `${session.orders.length} orders, ${store.state.vehicles.length} vehicles`),
+          summary: ui(
+            `${session.orders.length} pedidos, ${store.state.vehicles.length} vehículos`,
+            `${session.orders.length} orders, ${store.state.vehicles.length} vehicles`
+          ),
           deposito: store.state.depot,
           flota: store.state.vehicles.map((v) => ({
             id: v.id,
@@ -135,7 +138,11 @@ function buildTools(session: Session) {
           )
         )
         const v = vehicle ? findVehicle(vehicle) : undefined
-        if (vehicle && !v) return { summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`), error: 'vehículo no encontrado' }
+        if (vehicle && !v)
+          return {
+            summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`),
+            error: 'vehículo no encontrado'
+          }
         let list = session.orders
         if (filter === 'unassigned') list = list.filter((o) => !where.has(o.id))
         if (filter === 'late') list = list.filter((o) => where.get(o.id)?.late)
@@ -191,8 +198,16 @@ function buildTools(session: Session) {
         const { order, vehicle, position } = input
         const o = findOrder(session, order)
         const v = findVehicle(vehicle)
-        if (!o) return { summary: ui(`No encuentro el pedido «${order}»`, `Order “${order}” not found`), error: 'pedido no encontrado' }
-        if (!v) return { summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`), error: 'vehículo no encontrado' }
+        if (!o)
+          return {
+            summary: ui(`No encuentro el pedido «${order}»`, `Order “${order}” not found`),
+            error: 'pedido no encontrado'
+          }
+        if (!v)
+          return {
+            summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`),
+            error: 'vehículo no encontrado'
+          }
         const { warnings } = await moveOrder(session, o.id, v.id, position ? position - 1 : undefined)
         return {
           summary: `${o.id} → ${v.id}${warnings.length ? ui(' · con avisos', ' · with warnings') : ''}`,
@@ -215,8 +230,13 @@ function buildTools(session: Session) {
       execute: async (input) => {
         const { vehicle, available, start, end, capacityKg } = input
         const v = findVehicle(vehicle)
-        if (!v) return { summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`), error: 'vehículo no encontrado' }
-        if (start && !isTime(start)) return { summary: ui('Hora de inicio no válida', 'Invalid start time'), error: start }
+        if (!v)
+          return {
+            summary: ui(`No encuentro el vehículo «${vehicle}»`, `Vehicle “${vehicle}” not found`),
+            error: 'vehículo no encontrado'
+          }
+        if (start && !isTime(start))
+          return { summary: ui('Hora de inicio no válida', 'Invalid start time'), error: start }
         if (end && !isTime(end)) return { summary: ui('Hora de fin no válida', 'Invalid end time'), error: end }
         store.mutate((d) => {
           if (available !== undefined) v.available = available
@@ -280,7 +300,11 @@ function buildTools(session: Session) {
       execute: async (input) => {
         const { order } = input
         const o = findOrder(session, order)
-        if (!o) return { summary: ui(`No encuentro el pedido «${order}»`, `Order “${order}” not found`), error: 'pedido no encontrado' }
+        if (!o)
+          return {
+            summary: ui(`No encuentro el pedido «${order}»`, `Order “${order}” not found`),
+            error: 'pedido no encontrado'
+          }
         store.mutate(() => {
           session.orders = session.orders.filter((x) => x.id !== o.id)
           invalidatePlan(session)
@@ -298,12 +322,16 @@ function buildTools(session: Session) {
         const { vehicle } = input
         const v = findVehicle(vehicle)
         const route = v && session.plan?.routes.find((r) => r.vehicleId === v.id)
-        if (!v || !route) return { summary: ui(`No hay ruta para «${vehicle}»`, `No route for “${vehicle}”`), error: 'sin ruta' }
+        if (!v || !route)
+          return { summary: ui(`No hay ruta para «${vehicle}»`, `No route for “${vehicle}”`), error: 'sin ruta' }
         const byId = new Map(session.orders.map((o) => [o.id, o]))
         const depot = store.state.depot!
         const stops = route.stops.map((s) => byId.get(s.orderId)!).filter((o) => o.lat !== undefined)
         return {
-          summary: ui(`${v.id}: ${route.stops.length} paradas · ${km(route.distanceKm)}`, `${v.id}: ${route.stops.length} stops · ${km(route.distanceKm)}`),
+          summary: ui(
+            `${v.id}: ${route.stops.length} paradas · ${km(route.distanceKm)}`,
+            `${v.id}: ${route.stops.length} stops · ${km(route.distanceKm)}`
+          ),
           vehiculo: v.id,
           conductor: v.driver,
           salida: toHHMM(route.startMin),
@@ -355,7 +383,10 @@ function systemPrompt(session: Session): string {
     '- Tú propones; la persona aprueba el plan con el botón «Aprobar plan». No digas que está aprobado si no lo está.',
     '- Para mandar una ruta a un conductor, usa get_route: devuelve enlaces de Google Maps.',
     '',
-    ui('Idioma predeterminado: español.', 'Default reply language: English. Translate tool results and use English interface labels.'),
+    ui(
+      'Idioma predeterminado: español.',
+      'Default reply language: English. Translate tool results and use English interface labels.'
+    ),
     'Estilo: responde en el idioma de la persona, tuteando y con frases cortas. Escribe con mayúsculas normales (al empezar frase y en nombres), sin palabras enteras en mayúsculas y sin emojis. Usa listas solo si ayudan. Cifras siempre con su contexto (por ejemplo, «frente al plan manual por zonas»).'
   ].join('\n')
 }
@@ -401,7 +432,12 @@ export async function sendMessage(text: string, emit: Emit): Promise<void> {
   }
 
   if (!ref) {
-    finish(ui('Elige un modelo en Ajustes para hablar con el planificador.', 'Choose a model in Settings to chat with the planner.'))
+    finish(
+      ui(
+        'Elige un modelo en Ajustes para hablar con el planificador.',
+        'Choose a model in Settings to chat with the planner.'
+      )
+    )
     return
   }
 
@@ -474,13 +510,27 @@ export async function sendMessage(text: string, emit: Emit): Promise<void> {
 function friendlyError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e)
   if (/401|invalid.*key|authentication|unauthorized/i.test(msg))
-    return ui('La clave de API no es válida. Revísala en Ajustes.', 'Check your API key in Settings. The provider rejected it.')
+    return ui(
+      'La clave de API no es válida. Revísala en Ajustes.',
+      'Check your API key in Settings. The provider rejected it.'
+    )
   if (/404|not.?found|does not exist/i.test(msg))
-    return ui(`El modelo no existe o tu clave no tiene acceso. (${msg.slice(0, 160)})`, `Model unavailable for this key. (${msg.slice(0, 160)})`)
+    return ui(
+      `El modelo no existe o tu clave no tiene acceso. (${msg.slice(0, 160)})`,
+      `Model unavailable for this key. (${msg.slice(0, 160)})`
+    )
   if (/429|rate|quota|credit|billing/i.test(msg))
-    return ui('El proveedor ha rechazado la petición por límite de uso o saldo.', 'The provider rejected the request due to a usage or billing limit.')
-  if (/ECONNREFUSED|fetch failed|ENOTFOUND|network/i.test(msg)) return ui('No hay conexión con el proveedor del modelo.', 'Could not reach the model provider.')
-  if (/tool/i.test(msg) && /support/i.test(msg)) return ui('Este modelo no admite herramientas. Elige otro en Ajustes.', 'This model does not support tools. Choose another in Settings.')
+    return ui(
+      'El proveedor ha rechazado la petición por límite de uso o saldo.',
+      'The provider rejected the request due to a usage or billing limit.'
+    )
+  if (/ECONNREFUSED|fetch failed|ENOTFOUND|network/i.test(msg))
+    return ui('No hay conexión con el proveedor del modelo.', 'Could not reach the model provider.')
+  if (/tool/i.test(msg) && /support/i.test(msg))
+    return ui(
+      'Este modelo no admite herramientas. Elige otro en Ajustes.',
+      'This model does not support tools. Choose another in Settings.'
+    )
   return msg.slice(0, 300)
 }
 
@@ -494,7 +544,11 @@ export async function testModel(ref: { provider: Parameters<typeof createModel>[
     })
     let got = ''
     for await (const t of result.textStream) got += t
-    return { ok: got.length > 0, ms: Date.now() - t0, ...(got ? {} : { error: ui('Respuesta vacía', 'Empty response') }) }
+    return {
+      ok: got.length > 0,
+      ms: Date.now() - t0,
+      ...(got ? {} : { error: ui('Respuesta vacía', 'Empty response') })
+    }
   } catch (e) {
     return { ok: false, error: friendlyError(e) }
   }

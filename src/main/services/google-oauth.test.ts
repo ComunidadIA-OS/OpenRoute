@@ -55,6 +55,7 @@ describe('signInWithGoogle', () => {
       async (url) => {
         authorization = new URL(url)
         const redirect = new URL(authorization.searchParams.get('redirect_uri')!)
+        expect(authorization.searchParams.get('hl')).toBe('en')
         expect(authorization.origin).toBe('https://accounts.google.com')
         expect(authorization.searchParams.get('scope')).toBe('openid email profile')
         expect(authorization.searchParams.get('access_type')).toBe('online')
@@ -65,9 +66,12 @@ describe('signInWithGoogle', () => {
         expect(tokenFetch).not.toHaveBeenCalled()
         redirect.searchParams.set('code', 'codigo-aceptado')
         redirect.searchParams.set('state', authorization.searchParams.get('state')!)
-        expect((await fetchLoopback(redirect)).status).toBe(200)
+        const received = await fetchLoopback(redirect)
+        expect(received.status).toBe(200)
+        expect(await received.text()).toContain('Return to OpenRoute')
       },
-      new AbortController().signal
+      new AbortController().signal,
+      'en'
     )
 
     const [endpoint, options] = tokenFetch.mock.calls[0] as unknown as [string, { body: URLSearchParams }]

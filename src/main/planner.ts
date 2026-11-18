@@ -19,7 +19,12 @@ function planInputsKey(session: Session): string {
 
 function ensurePlanInputs(session: Session, key: string, previousPlan: Plan | null): void {
   if (store.session(session.id) !== session || planInputsKey(session) !== key || session.plan !== previousPlan) {
-    throw new Error(ui('El reparto cambió durante el cálculo. Vuelve a calcular las rutas.', 'The delivery run changed during planning. Recalculate the routes.'))
+    throw new Error(
+      ui(
+        'El reparto cambió durante el cálculo. Vuelve a calcular las rutas.',
+        'The delivery run changed during planning. Recalculate the routes.'
+      )
+    )
   }
 }
 
@@ -33,11 +38,21 @@ export async function locateOrders(session: Session): Promise<string[]> {
   const near = store.state.depot ?? undefined
   for (let k = 0; k < missing.length; k++) {
     const o = missing[k]
-    setBusy({ stage: 'geocoding', label: ui(`Buscando direcciones`, `Looking up addresses`), done: k, total: missing.length })
+    setBusy({
+      stage: 'geocoding',
+      label: ui(`Buscando direcciones`, `Looking up addresses`),
+      done: k,
+      total: missing.length
+    })
     const address = o.address
     const hit = await geocode(address, countryCodes, near)
     if (o.address !== address || !session.orders.includes(o) || store.session(session.id) !== session) {
-      throw new Error(ui('Los pedidos cambiaron mientras se buscaban direcciones. Vuelve a calcular las rutas.', 'Orders changed during address lookup. Recalculate the routes.'))
+      throw new Error(
+        ui(
+          'Los pedidos cambiaron mientras se buscaban direcciones. Vuelve a calcular las rutas.',
+          'Orders changed during address lookup. Recalculate the routes.'
+        )
+      )
     }
     if (hit) {
       store.mutate(() => {
@@ -69,13 +84,23 @@ async function attachGeometry(plan: Plan, orders: LocatedOrder[]): Promise<void>
   const depot = store.state.depot!
   const byId = new Map(orders.map((o) => [o.id, o]))
   const used = plan.routes.filter((r) => r.stops.length > 0)
-  setBusy({ stage: 'geometry', label: ui('Dibujando las rutas por calles', 'Drawing routes along roads'), done: 0, total: used.length })
+  setBusy({
+    stage: 'geometry',
+    label: ui('Dibujando las rutas por calles', 'Drawing routes along roads'),
+    done: 0,
+    total: used.length
+  })
   let done = 0
   await Promise.all(
     used.map(async (r) => {
       const path = [depot, ...r.stops.map((s) => byId.get(s.orderId)!), depot]
       r.geometry = await routeGeometry(store.state.settings.osrmUrl, path)
-      setBusy({ stage: 'geometry', label: ui('Dibujando las rutas por calles', 'Drawing routes along roads'), done: ++done, total: used.length })
+      setBusy({
+        stage: 'geometry',
+        label: ui('Dibujando las rutas por calles', 'Drawing routes along roads'),
+        done: ++done,
+        total: used.length
+      })
     })
   )
 }
@@ -84,8 +109,14 @@ export async function planSession(session: Session): Promise<Plan> {
   const depot = store.state.depot
   if (!depot) throw new Error(ui('Falta el depósito. Añádelo en Flota.', 'Add a depot in Fleet before planning.'))
   const vehicles = store.state.vehicles.filter((v) => v.available)
-  if (vehicles.length === 0) throw new Error(ui('No hay vehículos disponibles. Revisa la flota.', 'No vehicles are available. Check your fleet.'))
-  if (session.orders.length === 0) throw new Error(ui('No hay pedidos. Importa un CSV o carga el ejemplo.', 'There are no orders. Import a CSV or load the example.'))
+  if (vehicles.length === 0)
+    throw new Error(
+      ui('No hay vehículos disponibles. Revisa la flota.', 'No vehicles are available. Check your fleet.')
+    )
+  if (session.orders.length === 0)
+    throw new Error(
+      ui('No hay pedidos. Importa un CSV o carga el ejemplo.', 'There are no orders. Import a CSV or load the example.')
+    )
 
   try {
     const previousPlan = session.plan
@@ -97,14 +128,28 @@ export async function planSession(session: Session): Promise<Plan> {
       vehicles.some((v) => !store.state.vehicles.includes(v)) ||
       vehicles.length !== store.state.vehicles.filter((v) => v.available).length
     ) {
-      throw new Error(ui('La flota cambió durante el cálculo. Vuelve a calcular las rutas.', 'The fleet changed during planning. Recalculate the routes.'))
+      throw new Error(
+        ui(
+          'La flota cambió durante el cálculo. Vuelve a calcular las rutas.',
+          'The fleet changed during planning. Recalculate the routes.'
+        )
+      )
     }
-    if (orders.length === 0) throw new Error(ui('No se ha podido ubicar ningún pedido en el mapa.', 'None of the orders could be located on the map.'))
+    if (orders.length === 0)
+      throw new Error(
+        ui('No se ha podido ubicar ningún pedido en el mapa.', 'None of the orders could be located on the map.')
+      )
 
     setBusy({ stage: 'matrix', label: ui('Calculando distancias por calles', 'Calculating road distances') })
     const matrix = await matrixFor(session, [depot, ...orders])
 
-    setBusy({ stage: 'solving', label: ui(`Optimizando ${orders.length} pedidos en ${vehicles.length} vehículos`, `Optimizing ${orders.length} orders across ${vehicles.length} vehicles`) })
+    setBusy({
+      stage: 'solving',
+      label: ui(
+        `Optimizando ${orders.length} pedidos en ${vehicles.length} vehículos`,
+        `Optimizing ${orders.length} orders across ${vehicles.length} vehicles`
+      )
+    })
     const serviceMin = store.state.settings.serviceMin
     const input = { depot, vehicles, orders, matrix, serviceMin }
     // Tope de seguridad: con muchos pedidos el motor para aquí aunque le queden vueltas.
@@ -151,11 +196,16 @@ export async function moveOrder(
   const plan = session.plan
   const depot = store.state.depot
   if (!plan || !depot) throw new Error(ui('Primero calcula un plan.', 'Calculate a plan first.'))
-  if (plan.status === 'approved') throw new Error(ui('El plan está aprobado. Reábrelo para cambiarlo.', 'Reopen the approved plan to edit it.'))
+  if (plan.status === 'approved')
+    throw new Error(ui('El plan está aprobado. Reábrelo para cambiarlo.', 'Reopen the approved plan to edit it.'))
   const vehicles = store.state.vehicles.filter((v) => v.available || plan.routes.some((r) => r.vehicleId === v.id))
-  if (!vehicles.some((v) => v.id === vehicleId)) throw new Error(ui(`No existe el vehículo ${vehicleId}.`, `Vehicle ${vehicleId} does not exist.`))
+  if (!vehicles.some((v) => v.id === vehicleId))
+    throw new Error(ui(`No existe el vehículo ${vehicleId}.`, `Vehicle ${vehicleId} does not exist.`))
   const orders = located(session)
-  if (!orders.some((o) => o.id === orderId)) throw new Error(ui(`No existe el pedido ${orderId} o no tiene ubicación.`, `Order ${orderId} is missing or has no location.`))
+  if (!orders.some((o) => o.id === orderId))
+    throw new Error(
+      ui(`No existe el pedido ${orderId} o no tiene ubicación.`, `Order ${orderId} is missing or has no location.`)
+    )
 
   const assignment: Record<string, string[]> = {}
   for (const v of vehicles) {
@@ -187,7 +237,8 @@ export async function moveOrder(
   await attachGeometry({ ...next, routes: routes.filter((r) => changed.has(r.vehicleId)) }, orders)
   setBusy(null)
   ensurePlanInputs(session, inputsKey, plan)
-  if (plan.status !== 'draft') throw new Error(ui('El plan está aprobado. Reábrelo para cambiarlo.', 'Reopen the approved plan to edit it.'))
+  if (plan.status !== 'draft')
+    throw new Error(ui('El plan está aprobado. Reábrelo para cambiarlo.', 'Reopen the approved plan to edit it.'))
   store.mutate(() => {
     session.plan = next
     store.touch(session)

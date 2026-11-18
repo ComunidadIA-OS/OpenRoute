@@ -2,6 +2,7 @@ import { app, shell } from 'electron'
 import { join } from 'node:path'
 import type { GoogleAccountState } from '../shared/types'
 import { readGoogleClient, signInWithGoogle } from './services/google-oauth'
+import { ui } from './ui-language'
 import { store } from './store'
 
 let config: ReturnType<typeof readGoogleClient> | undefined
@@ -32,16 +33,21 @@ export async function startGoogleSignIn(): Promise<void> {
   error = null
   store.emit('change')
   try {
-    const profile = await signInWithGoogle(credentials, (url) => shell.openExternal(url), controller.signal)
+    const profile = await signInWithGoogle(
+      credentials,
+      (url) => shell.openExternal(url),
+      controller.signal,
+      store.state.settings.language
+    )
     if (!controller.signal.aborted) store.mutate((data) => void (data.googleProfile = profile))
   } catch (failure) {
     if (!controller.signal.aborted) {
       error =
         failure instanceof Error && failure.name === 'TimeoutError'
-          ? 'Se agotó el tiempo para iniciar sesión con Google.'
+          ? ui('Se agotó el tiempo para iniciar sesión con Google.', 'Google sign-in timed out.')
           : failure instanceof Error
             ? failure.message
-            : 'No se pudo iniciar sesión con Google.'
+            : ui('No se pudo iniciar sesión con Google.', 'Could not sign in with Google.')
     }
   } finally {
     pending = null

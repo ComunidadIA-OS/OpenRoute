@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { OAuth2Client } from 'google-auth-library'
 import { z } from 'zod'
-import type { GoogleProfile } from '../../shared/types'
+import type { AppLanguage, GoogleProfile } from '../../shared/types'
 
 const loopback = '127.0.0.1'
 const callbackPath = '/oauth/google'
@@ -30,7 +30,8 @@ export function readGoogleClient(paths: string[]): DesktopClient | null {
 function openCallback(
   state: string,
   openBrowser: (redirect: URL) => Promise<void>,
-  signal: AbortSignal
+  signal: AbortSignal,
+  language: AppLanguage
 ): Promise<{ code: string; redirect: URL }> {
   return new Promise((resolve, reject) => {
     signal.throwIfAborted()
@@ -59,33 +60,70 @@ function openCallback(
         url?.origin !== redirect.origin ||
         url.pathname !== callbackPath
       ) {
-        res.writeHead(404).end('Página no encontrada.')
+        res.writeHead(404).end(language === 'en' ? 'Page not found.' : 'Página no encontrada.')
         return
       }
       if (url.searchParams.getAll('state').length !== 1 || url.searchParams.get('state') !== state) {
-        res.writeHead(400).end('Esta solicitud no corresponde al inicio de sesión de OpenRoute.')
+        res
+          .writeHead(400)
+          .end(
+            language === 'en'
+              ? 'This request does not match your OpenRoute sign-in.'
+              : 'Esta solicitud no corresponde al inicio de sesión de OpenRoute.'
+          )
         return
       }
       const [code, ...extras] = url.searchParams.getAll('code')
       if (url.searchParams.has('error') || !code || extras.length > 0) {
-        res.writeHead(400).end('Inicio de sesión cancelado. Vuelve a OpenRoute.', () => {
-          fail(new Error('Google no completó el inicio de sesión.'))
-        })
+        res
+          .writeHead(400)
+          .end(
+            language === 'en'
+              ? 'Sign-in cancelled. Return to OpenRoute.'
+              : 'Inicio de sesión cancelado. Vuelve a OpenRoute.',
+            () => {
+              fail(
+                new Error(
+                  language === 'en' ? 'Google did not complete sign-in.' : 'Google no completó el inicio de sesión.'
+                )
+              )
+            }
+          )
         return
       }
       const callback = { code, redirect }
-      res.end('Solicitud recibida. Vuelve a OpenRoute para ver el resultado.', () => {
-        close()
-        resolve(callback)
-      })
+      res.end(
+        language === 'en'
+          ? 'Request received. Return to OpenRoute to see the result.'
+          : 'Solicitud recibida. Vuelve a OpenRoute para ver el resultado.',
+        () => {
+          close()
+          resolve(callback)
+        }
+      )
     })
-    server.once('error', () => fail(new Error('No se pudo abrir la conexión local para iniciar sesión.')))
+    server.once('error', () =>
+      fail(
+        new Error(
+          language === 'en'
+            ? 'Could not open the local connection for sign-in.'
+            : 'No se pudo abrir la conexión local para iniciar sesión.'
+        )
+      )
+    )
     signal.addEventListener('abort', abort, { once: true })
     server.listen(0, loopback, () => {
       const address = server.address()
-      if (!address || typeof address === 'string') return fail(new Error('No se pudo abrir la conexión local.'))
+      if (!address || typeof address === 'string')
+        return fail(
+          new Error(language === 'en' ? 'Could not open the local connection.' : 'No se pudo abrir la conexión local.')
+        )
       redirect = new URL(`http://${loopback}:${address.port}${callbackPath}`)
-      void openBrowser(redirect).catch(() => fail(new Error('No se pudo abrir el navegador del sistema.')))
+      void openBrowser(redirect).catch(() =>
+        fail(
+          new Error(language === 'en' ? 'Could not open your browser.' : 'No se pudo abrir el navegador del sistema.')
+        )
+      )
     })
   })
 }
@@ -93,7 +131,8 @@ function openCallback(
 export async function signInWithGoogle(
   config: DesktopClient,
   openBrowser: (url: string) => Promise<void>,
-  cancel: AbortSignal
+  cancel: AbortSignal,
+  language: AppLanguage = 'es'
 ): Promise<GoogleProfile> {
   const verifier = randomBytes(32).toString('base64url')
   const state = randomBytes(32).toString('base64url')
@@ -110,6 +149,7 @@ export async function signInWithGoogle(
         scope: 'openid email profile',
         access_type: 'online',
         prompt: 'select_account',
+        hl: language,
         code_challenge: createHash('sha256').update(verifier).digest('base64url'),
         code_challenge_method: 'S256',
         state,
@@ -117,7 +157,8 @@ export async function signInWithGoogle(
       }).toString()
       await openBrowser(url.href)
     },
-    signal
+    signal,
+    language
   )
 
   try {
@@ -143,6 +184,10 @@ export async function signInWithGoogle(
     return { name: profile.name?.trim() || profile.email, email: profile.email }
   } catch {
     signal.throwIfAborted()
-    throw new Error('No se pudo verificar la identidad con Google. Vuelve a intentarlo.')
+    throw new Error(
+      language === 'en'
+        ? 'Could not verify your identity with Google. Try again.'
+        : 'No se pudo verificar la identidad con Google. Vuelve a intentarlo.'
+    )
   }
 }
