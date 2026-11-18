@@ -26,6 +26,8 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  include: build/installer.nsh
+  installerLanguages: [en_US, es_ES]
   artifactName: OpenRoute-Setup.${ext}
   shortcutName: OpenRoute
   uninstallDisplayName: OpenRoute

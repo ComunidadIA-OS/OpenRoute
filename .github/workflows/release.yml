@@ -81,7 +81,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Azure CLI no pudo obtener un token para Artifact Signing.' }
           npm run dist:win -- --config .github/electron-builder.windows-signing.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Verificar firma y generar SHA-256
+      - name: Verificar firma y preparar las descargas por idioma
         shell: pwsh
         run: |
           foreach ($file in 'dist/OpenRoute-Setup.exe', 'dist/win-unpacked/OpenRoute.exe') {
@@ -96,6 +96,13 @@ jobs:
           }
           $hash = (Get-FileHash -LiteralPath dist/OpenRoute-Setup.exe -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  OpenRoute-Setup.exe" | Set-Content -LiteralPath dist/OpenRoute-Setup.exe.sha256 -Encoding ascii
+          foreach ($language in 'es', 'en') {
+            $alias = "OpenRoute-Setup-$language.exe"
+            Copy-Item -LiteralPath dist/OpenRoute-Setup.exe -Destination "dist/$alias"
+            $aliasHash = (Get-FileHash -LiteralPath "dist/$alias" -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($aliasHash -cne $hash) { throw "La copia $alias no coincide con el instalador firmado." }
+            "$aliasHash  $alias" | Set-Content -LiteralPath "dist/$alias.sha256" -Encoding ascii
+          }
       - name: Publicar en la release
         shell: bash
         env:
@@ -103,10 +110,15 @@ jobs:
         run: |
           TAG="${GITHUB_REF_NAME}"
           NOTES=$(awk "/^## \[${TAG#v}\]/{flag=1;next}/^## \[/{flag=0}flag" CHANGELOG.md)
+          files=(
+            dist/OpenRoute-Setup.exe{,.sha256}
+            dist/OpenRoute-Setup-es.exe{,.sha256}
+            dist/OpenRoute-Setup-en.exe{,.sha256}
+          )
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/OpenRoute-Setup.exe dist/OpenRoute-Setup.exe.sha256
+            gh release upload "$TAG" "${files[@]}"
           else
-            gh release create "$TAG" dist/OpenRoute-Setup.exe dist/OpenRoute-Setup.exe.sha256 --verify-tag --title "OpenRoute $TAG" --notes "$NOTES"
+            gh release create "$TAG" "${files[@]}" --verify-tag --title "OpenRoute $TAG" --notes "$NOTES"
           fi
 
   macos:

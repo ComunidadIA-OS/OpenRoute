@@ -3,6 +3,7 @@
 
 /** 3 = alta, 2 = media, 1 = baja. */
 export type Priority = 1 | 2 | 3
+export type AppLanguage = 'es' | 'en'
 
 export interface LatLng {
   lat: number

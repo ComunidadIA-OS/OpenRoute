@@ -8,8 +8,9 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import type { ModelMessage } from 'ai'
 import type { Depot, Order, Plan, Vehicle } from '../core/types'
-import type { ChatMessage, GoogleProfile, ProviderId, Settings } from '../shared/types'
+import type { AppLanguage, ChatMessage, GoogleProfile, ProviderId, Settings } from '../shared/types'
 import { PROVIDERS } from '../shared/types'
+import { isAppLanguage, selectLanguage } from './language'
 
 export interface Session {
   id: string
@@ -37,27 +38,36 @@ interface Persisted {
 
 export const DEFAULT_OSRM = 'https://router.project-osrm.org'
 
-function defaultSettings(): Settings {
+function defaultSettings(language: AppLanguage): Settings {
   const providers = Object.fromEntries(
     PROVIDERS.map((p) => [p.id, { hasKey: false, ...(p.defaultBaseURL ? { baseURL: p.defaultBaseURL } : {}) }])
   ) as Settings['providers']
-  return { providers, activeModel: null, osrmUrl: DEFAULT_OSRM, countryCodes: 'es', serviceMin: 8 }
+  return { language, providers, activeModel: null, osrmUrl: DEFAULT_OSRM, countryCodes: 'es', serviceMin: 8 }
+}
+
+function installerLanguage(): string | undefined {
+  if (process.platform !== 'win32' || !app.isPackaged) return undefined
+  try {
+    return readFileSync(join(process.resourcesPath, 'installer-language'), 'utf8').trim()
+  } catch {
+    return undefined
+  }
 }
 
 export function newId(prefix = ''): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
 }
 
-export function sessionTitle(date = new Date()): string {
-  const s = date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' })
-  return `Reparto del ${s}`
+export function sessionTitle(date = new Date(), language: AppLanguage = 'es'): string {
+  const s = date.toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'short' })
+  return language === 'en' ? `Delivery plan for ${s}` : `Reparto del ${s}`
 }
 
-export function emptySession(): Session {
+export function emptySession(language: AppLanguage = 'es'): Session {
   const now = new Date().toISOString()
   return {
     id: newId('s_'),
-    title: sessionTitle(),
+    title: sessionTitle(new Date(now), language),
     createdAt: now,
     updatedAt: now,
     orders: [],
@@ -76,13 +86,16 @@ class Store extends EventEmitter {
     const dir = app.getPath('userData')
     mkdirSync(dir, { recursive: true })
     this.file = join(dir, 'openroute.json')
+    const installed = installerLanguage()
+    const system = app.getPreferredSystemLanguages()[0] ?? ''
+    let persistLanguage = true
     const fresh: Persisted = {
       version: 1,
       depot: null,
       vehicles: [],
       sessions: [],
       activeId: null,
-      settings: defaultSettings(),
+      settings: defaultSettings(selectLanguage(undefined, installed, system)),
       googleProfile: null,
       secrets: {}
     }
@@ -91,6 +104,8 @@ class Store extends EventEmitter {
         const raw = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<Persisted>
         const settings = { ...fresh.settings, ...raw.settings }
         settings.providers = { ...fresh.settings.providers, ...raw.settings?.providers }
+        persistLanguage = !isAppLanguage(raw.settings?.language)
+        settings.language = selectLanguage(raw.settings?.language, installed, system)
         this.data = { ...fresh, ...raw, settings, version: 1 }
       } catch {
         // Un archivo dañado no debe impedir abrir la app: se aparta y se empieza de cero.
@@ -122,12 +137,19 @@ class Store extends EventEmitter {
       }
     }
     if (this.data.sessions.length === 0) {
-      const s = emptySession()
+      const s = emptySession(this.data.settings.language)
       this.data.sessions.push(s)
       this.data.activeId = s.id
     }
     if (!this.data.sessions.some((s) => s.id === this.data.activeId)) {
       this.data.activeId = this.data.sessions[0].id
+    }
+    if (persistLanguage) {
+      try {
+        this.flush()
+      } catch {
+        // Un perfil de solo lectura puede usar el idioma durante esta sesión.
+      }
     }
   }
 

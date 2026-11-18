@@ -7,7 +7,7 @@ const electron = vi.hoisted(() => ({ dir: '', openExternal: vi.fn() }))
 const oauth = vi.hoisted(() => ({ readGoogleClient: vi.fn(), signInWithGoogle: vi.fn() }))
 
 vi.mock('electron', () => ({
-  app: { getPath: () => electron.dir, isPackaged: false },
+  app: { getPath: () => electron.dir, getPreferredSystemLanguages: () => ['es-ES'], isPackaged: false },
   shell: { openExternal: electron.openExternal }
 }))
 vi.mock('./services/google-oauth', () => oauth)

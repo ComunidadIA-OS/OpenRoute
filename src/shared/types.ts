@@ -1,6 +1,6 @@
 // Contrato entre el proceso principal y la interfaz.
 
-import type { Depot, Order, Plan, Vehicle } from '../core/types'
+import type { AppLanguage, Depot, Order, Plan, Vehicle } from '../core/types'
 import type { LocalCliId, LocalCliLaunch, LocalCliList } from './local-cli'
 
 export type ProviderId = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'ollama' | 'custom'
@@ -84,7 +84,10 @@ export interface ProviderSettings {
   baseURL?: string
 }
 
+export type { AppLanguage } from '../core/types'
+
 export interface Settings {
+  language: AppLanguage
   providers: Record<ProviderId, ProviderSettings>
   activeModel: ModelRef | null
   /** Motor de rutas OSRM. El público es solo para pruebas. */
