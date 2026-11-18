@@ -1,7 +1,8 @@
-import { LoaderCircle, Map as MapIcon, PanelLeftOpen, Table2, Truck } from 'lucide-react'
+import { CircleHelp, LoaderCircle, Map as MapIcon, PanelLeftOpen, Table2, Truck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Chat } from './components/Chat'
 import { EmptyState } from './components/EmptyState'
+import { FirstRunTour, hasSeenTour, rememberTour } from './components/FirstRunTour'
 import { FleetView } from './components/FleetView'
 import { MapView } from './components/MapView'
 import { OrdersView } from './components/OrdersView'
@@ -109,6 +110,14 @@ export function App() {
 
   const [loadFailed, setLoadFailed] = useState(false)
   const [loadAttempt, setLoadAttempt] = useState(0)
+  const [tourOpen, setTourOpen] = useState(() => !hasSeenTour())
+  const tourButton = useRef<HTMLButtonElement>(null)
+
+  function closeTour(): void {
+    rememberTour()
+    setTourOpen(false)
+    tourButton.current?.focus()
+  }
 
   useEffect(() => {
     let active = true
@@ -191,6 +200,7 @@ export function App() {
             {TABS.map((t) => (
               <button
                 key={t.id}
+                data-tour={t.id}
                 onClick={() => setView(t.id)}
                 className={cn(
                   'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px]',
@@ -202,9 +212,19 @@ export function App() {
               </button>
             ))}
           </nav>
+          <button
+            ref={tourButton}
+            type="button"
+            onClick={() => setTourOpen(true)}
+            className="no-drag rounded-md p-1.5 text-tx-3 hover:bg-bg-3 hover:text-tx focus-visible:outline-ac"
+            aria-label="Abrir guía de inicio"
+            title="Guía de inicio"
+          >
+            <CircleHelp aria-hidden="true" size={16} />
+          </button>
         </header>
         <div className="flex min-h-0 flex-1">
-          <div className="w-[400px] shrink-0 border-r border-line">
+          <div data-tour="chat" className="w-[400px] shrink-0 border-r border-line">
             <Chat />
           </div>
           <main className="relative min-w-0 flex-1 overflow-hidden">
@@ -229,6 +249,7 @@ export function App() {
       </div>
       <SettingsDialog />
       <Toasts />
+      {tourOpen && <FirstRunTour onClose={closeTour} />}
     </div>
   )
 }
