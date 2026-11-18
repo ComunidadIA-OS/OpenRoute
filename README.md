@@ -71,6 +71,8 @@ Para tus pedidos, mira el [formato de importación](docs/importar-pedidos.md).
 
 ## Privacidad
 
+Puedes identificarte opcionalmente con una cuenta de Google desde **Ajustes → Cuenta**. OpenRoute guarda el nombre y correo en este equipo. Cada instalación mantiene sus pedidos, flota y planes por separado. [Cuenta de Google en OpenRoute](docs/cuenta-google.md).
+
 Los pedidos, la flota y los planes se guardan solo en tu ordenador. Salen de él tres cosas, y solo cuando hacen falta:
 
 - Las direcciones sin coordenadas, hacia [Nominatim](https://nominatim.org) (OpenStreetMap) para ubicarlas en el mapa.

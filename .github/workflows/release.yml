@@ -24,6 +24,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Preparar el cliente de Google opcional
+        shell: pwsh
+        env:
+          GOOGLE_DESKTOP_OAUTH_JSON: ${{ secrets.GOOGLE_DESKTOP_OAUTH_JSON }}
+        run: |
+          $config = $env:GOOGLE_DESKTOP_OAUTH_JSON
+          if ([string]::IsNullOrWhiteSpace($config)) { exit 0 }
+          try {
+            $client = ($config | ConvertFrom-Json -ErrorAction Stop).installed
+          } catch {
+            throw 'GOOGLE_DESKTOP_OAUTH_JSON debe contener un cliente OAuth de escritorio en JSON.'
+          }
+          if ($client.client_id -cnotmatch '^[a-z\d-]+\.apps\.googleusercontent\.com$') {
+            throw 'GOOGLE_DESKTOP_OAUTH_JSON necesita un identificador de cliente OAuth de escritorio válido.'
+          }
+          Set-Content -LiteralPath resources/google-oauth.json -Value $config -Encoding utf8NoBOM
       - name: Comprobar versión y configuración de firma
         shell: pwsh
         env:
