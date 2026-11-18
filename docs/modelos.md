@@ -4,6 +4,12 @@ Abre **Ajustes → Modelos de IA**, elige un proveedor, pega tu clave y pulsa **
 
 No hace falta modelo para calcular rutas: el botón «Calcular rutas» usa solo el motor. El modelo sirve para pedir cambios hablando y para que te explique el plan.
 
+## Usar una suscripción desde el terminal en Windows
+
+En **Ajustes → Terminales de IA**, abre [Codex CLI](https://developers.openai.com/codex/cli), [Antigravity CLI](https://antigravity.google/docs/cli/tutorial/) o [Claude Code](https://code.claude.com/docs/en/setup). Instala el ejecutable nativo del proveedor y pulsa **Volver a comprobar** si la app estaba abierta. El inicio de sesión de cada CLI se hace desde su propio terminal y es independiente de la cuenta de OpenRoute.
+
+OpenRoute abre el CLI interactivo en una carpeta temporal vacía. Para pedir ayuda a Codex o Antigravity, puedes revisar y copiar los totales del reparto y pegarlos tú en el terminal. El resumen contiene cantidades, distancias y tiempos del motor. Los datos de clientes y las direcciones permanecen en OpenRoute. El chat integrado de **Modelos de IA** usa la conexión configurada en esa pestaña.
+
 ## Qué modelo elegir
 
 El planificador usa herramientas, así que necesita un modelo que las maneje bien.

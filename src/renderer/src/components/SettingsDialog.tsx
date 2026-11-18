@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { PROVIDERS, type ProviderId } from '@shared/types'
 import { cn } from '../lib/format'
 import { api, useUi } from '../store'
+import { CliTab } from './CliTab'
 import { CuentaGoogle } from './CuentaGoogle'
 import { Isotipo } from './Logo'
 import { ProviderIcon } from './ProviderIcon'
@@ -302,6 +303,7 @@ export function SettingsDialog() {
           {(
             [
               ['models', 'Modelos de IA'],
+              ['cli', 'Terminales de IA'],
               ['routing', 'Mapa y rutas'],
               ['account', 'Cuenta'],
               ['about', 'Acerca de']
@@ -366,6 +368,11 @@ export function SettingsDialog() {
               <div className="min-w-0 flex-1 overflow-y-auto p-6 pt-12">
                 <ProviderEditor key={provider} id={provider} />
               </div>
+            </div>
+          )}
+          {settingsTab === 'cli' && (
+            <div className="overflow-y-auto p-6 pt-12">
+              <CliTab />
             </div>
           )}
           {settingsTab === 'routing' && (
