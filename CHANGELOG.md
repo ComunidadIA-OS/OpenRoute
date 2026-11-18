@@ -2,7 +2,11 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
-## Pendiente de publicar
+## [0.2.0] - Pendiente de publicar
+
+- La guía de cuatro pasos presenta Pedidos, Flota, Mapa y Chat. Puedes omitirla o volver a abrirla desde Ayuda.
+- En Ajustes puedes asociar una cuenta Google a tu perfil local. Los repartos se conservan al cerrar la aplicación y también se pueden usar sin cuenta.
+- En Windows puedes abrir las herramientas oficiales de Claude, Codex y Antigravity desde Ajustes y elegir qué resumen del reparto compartir en el terminal.
 
 - Los cambios de pedidos, flota y depósito invalidan los planes afectados antes de exportarlos.
 - CSV y Excel conservan identificadores únicos y respetan las horas de las celdas de Excel.
