@@ -1,6 +1,7 @@
 // Contrato entre el proceso principal y la interfaz.
 
 import type { Depot, Order, Plan, Vehicle } from '../core/types'
+import type { LocalCliId, LocalCliLaunch, LocalCliList } from './local-cli'
 
 export type ProviderId = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'ollama' | 'custom'
 
@@ -211,6 +212,9 @@ export interface OpenRouteApi {
   signInWithGoogle(): Promise<void>
   cancelGoogleSignIn(): Promise<void>
   signOutGoogle(): Promise<void>
+
+  listLocalClis(): Promise<LocalCliList>
+  launchLocalCli(id: LocalCliId): Promise<LocalCliLaunch>
 
   openExternal(url: string): Promise<void>
   appInfo(): Promise<{ version: string; platform: string }>

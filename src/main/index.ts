@@ -3,6 +3,7 @@ import { app, BrowserWindow, net, protocol, shell } from 'electron'
 import { join, normalize, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import icon from '../../resources/icon.png?asset'
+import { registerCliIpc } from './cli/ipc'
 import { registerIpc } from './ipc'
 import { store } from './store'
 
@@ -100,6 +101,7 @@ if (!app.requestSingleInstanceLock()) {
     serveRenderer()
     store.load()
     registerIpc(() => win)
+    registerCliIpc(() => win)
     createWindow()
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

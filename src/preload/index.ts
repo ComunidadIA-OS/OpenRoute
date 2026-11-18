@@ -50,6 +50,9 @@ const api: OpenRouteApi = {
   cancelGoogleSignIn: () => invoke('google:cancel'),
   signOutGoogle: () => invoke('google:sign-out'),
 
+  listLocalClis: () => invoke('cli:list'),
+  launchLocalCli: (id) => invoke('cli:launch', id),
+
   openExternal: (url) => invoke('app:open', url),
   appInfo: () => invoke('app:info')
 }
