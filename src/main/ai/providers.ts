@@ -2,6 +2,7 @@
 // Claude, ChatGPT y Gemini con sus SDK oficiales del AI SDK; OpenRouter, Ollama
 // y cualquier servidor compatible con la API de OpenAI por la vía compatible.
 
+import { ui } from '../ui-language'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { createOpenAI } from '@ai-sdk/openai'
@@ -21,7 +22,7 @@ function requireKey(id: ProviderId): string {
   const key = store.getSecret(id)
   if (!key) {
     const name = PROVIDERS.find((p) => p.id === id)?.name ?? id
-    throw new Error(`Falta la clave de ${name}. Añádela en Ajustes.`)
+    throw new Error(ui(`Falta la clave de ${name}. Añádela en Ajustes.`, `The ${name} key is missing. Add it in Settings.`))
   }
   return key
 }

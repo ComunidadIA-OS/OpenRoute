@@ -2,6 +2,7 @@
 // El modelo entiende lo que pides; las rutas, horas y cifras salen siempre del
 // motor (core/solver.ts). Aprobar el plan es cosa de la persona, no del agente.
 
+import { ui } from '../ui-language'
 import { stepCountIs, streamText, tool, type ModelMessage } from 'ai'
 import { z } from 'zod'
 import { googleMapsLegs } from '../../core/maps-links'
@@ -15,10 +16,6 @@ import { newId, store, type Session } from '../store'
 import { createModel } from './providers'
 
 type Emit = (e: ChatEvent) => void
-
-function ui(es: string, en: string): string {
-  return store.state.settings.language === 'en' ? en : es
-}
 
 const PRIORITY: Record<Priority, string> = { 3: 'alta', 2: 'media', 1: 'baja' }
 const ORIGEN_DISTANCIAS = {

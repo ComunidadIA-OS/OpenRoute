@@ -1,3 +1,4 @@
+import { ui } from '../ui-language'
 import { app, ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { mkdtemp } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -22,18 +23,18 @@ export function registerCliIpc(getWindow: () => BrowserWindow | null): void {
 
   ipcMain.handle('cli:launch', async (event, id: unknown): Promise<LocalCliLaunch> => {
     if (process.platform !== 'win32' || !isMainFrame(event) || !isCliId(id)) {
-      return { ok: false, error: 'Este terminal no está disponible.' }
+      return { ok: false, error: ui('Este terminal no está disponible.', 'This terminal is unavailable.') }
     }
 
     const binary = await findWindowsCli(id)
-    if (!binary) return { ok: false, error: 'Instala la versión nativa del CLI y vuelve a comprobar.' }
+    if (!binary) return { ok: false, error: ui('Instala la versión nativa del CLI y vuelve a comprobar.', 'Install the native CLI and check again.') }
 
     try {
       const directory = await mkdtemp(join(app.getPath('temp'), `OpenRoute-${id}-`))
       await launchWindowsCli(binary, directory)
       return { ok: true }
     } catch {
-      return { ok: false, error: 'No se pudo abrir el CLI. Comprueba que se abre desde el terminal de Windows.' }
+      return { ok: false, error: ui('No se pudo abrir el CLI. Comprueba que se abre desde el terminal de Windows.', 'Could not open the CLI. Check that it starts in Windows Terminal.') }
     }
   })
 }

@@ -62,7 +62,8 @@ Las claves se cifran con el almacén seguro del sistema (DPAPI en Windows, Keych
 
 ## Empezar en un minuto
 
-1. [Descarga el instalador de Windows](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe). En las versiones firmadas puedes comprobar quién lo publicó en **Propiedades → Firmas digitales** y comparar su SHA-256 con el que aparece en la página de la versión. El instalador 0.2.0 se distribuye sin firma de editor. Si Windows bloquea el archivo, espera una versión firmada o [compila la app desde el código](#desarrollo).
+1. [Descarga el instalador de Windows](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe). En las versiones firmadas puedes comprobar quién lo publicó en **Propiedades → Firmas digitales** y comparar su SHA-256 con el que aparece en la página de la versión. El instalador 0.2.1 se distribuye sin firma de editor. Si Windows bloquea el archivo, espera una versión firmada o [compila la app desde el código](#desarrollo).
+   La descarga desde [la web en inglés](https://openroute.es/en/) inicia OpenRoute en inglés en un perfil nuevo. Puedes cambiar el idioma en Ajustes y conservar tus repartos.
 2. Pulsa **Probar con un ejemplo**: carga 30 pedidos de ejemplo en Alicante y Elche y una flota de tres furgonetas.
 3. Pulsa **Calcular rutas**.
 4. Si quieres hablar con el planificador, abre **Ajustes**, elige un proveedor y pega tu clave.
