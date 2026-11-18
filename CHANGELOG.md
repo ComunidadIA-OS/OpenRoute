@@ -2,7 +2,7 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
-## [0.2.0] - Pendiente de publicar
+## [0.2.0] - 2026-11-18
 
 - La guía de cuatro pasos presenta Pedidos, Flota, Mapa y Chat. Puedes omitirla o volver a abrirla desde Ayuda.
 - En Ajustes puedes asociar una cuenta Google a tu perfil local. Los repartos se conservan al cerrar la aplicación y también se pueden usar sin cuenta.
