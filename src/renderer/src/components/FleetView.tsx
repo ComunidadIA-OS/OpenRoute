@@ -4,12 +4,15 @@ import type { Vehicle } from '@core/types'
 import { cn, routeColor } from '../lib/format'
 import { api, useUi } from '../store'
 
+import { useI18n } from '../lib/i18n'
+
 const field = 'w-full rounded-lg border border-line bg-bg-1 px-2.5 py-1.5 text-[13px] outline-none focus:border-ac/50'
 
 function DepotCard() {
+  const { t, detail } = useI18n()
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
-  const [name, setName] = useState(app.depot?.name ?? 'Depósito')
+  const [name, setName] = useState(app.depot?.name)
   const [address, setAddress] = useState(app.depot?.address ?? '')
   const [saving, setSaving] = useState(false)
   return (
@@ -18,15 +21,10 @@ function DepotCard() {
         e.preventDefault()
         setSaving(true)
         try {
-          await api.setDepot({ name, address })
-          toast('Depósito guardado', 'ok')
+          await api.setDepot({ name: name?.trim() || t('Depósito'), address })
+          toast(t('Depósito guardado'), 'ok')
         } catch (err) {
-          toast(
-            err instanceof Error
-              ? err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
-              : 'Error',
-            'error'
-          )
+          toast(err instanceof Error ? detail(err.message) : t('Error'), 'error')
         } finally {
           setSaving(false)
         }
@@ -34,7 +32,7 @@ function DepotCard() {
       className="rounded-2xl border border-line bg-bg-1/60 p-4"
     >
       <div className="flex items-center gap-2 text-[13px] font-medium">
-        <Warehouse size={15} className="text-ac" /> Depósito
+        <Warehouse size={15} className="text-ac" /> {t('Depósito')}
         {app.depot && (
           <span className="ml-auto font-mono text-[11px] text-tx-3">
             {app.depot.lat.toFixed(4)}, {app.depot.lng.toFixed(4)}
@@ -42,27 +40,35 @@ function DepotCard() {
         )}
       </div>
       <div className="mt-3 grid grid-cols-[1fr_2fr_auto] gap-2">
-        <input className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" />
+        <input
+          className={field}
+          value={name ?? t('Depósito')}
+          onChange={(e) => setName(e.target.value)}
+          aria-label={t('Nombre')}
+          placeholder={t('Nombre')}
+        />
         <input
           className={field}
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Dirección del almacén"
+          placeholder={t('Dirección del almacén')}
+          aria-label={t('Dirección del almacén')}
           required
         />
         <button
           disabled={saving}
           className="rounded-lg bg-ac px-3 text-[12.5px] font-semibold text-ac-ink disabled:opacity-60"
         >
-          {saving ? 'Buscando…' : 'Guardar'}
+          {saving ? t('Buscando…') : t('Guardar')}
         </button>
       </div>
-      <p className="mt-2 text-[11.5px] text-tx-3">Todas las rutas salen y vuelven aquí.</p>
+      <p className="mt-2 text-[11.5px] text-tx-3">{t('Todas las rutas salen y vuelven aquí.')}</p>
     </form>
   )
 }
 
 function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
+  const { t } = useI18n()
   const [d, setD] = useState(v)
   const save = (patch: Partial<Vehicle>): void => {
     const next = { ...d, ...patch }
@@ -80,6 +86,7 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
         <span className="h-2.5 w-2.5 rounded-full" style={{ background: routeColor(index) }} />
         <input
           className="min-w-0 flex-1 bg-transparent text-[14px] font-medium outline-none"
+          aria-label={t('Nombre del vehículo')}
           value={d.name}
           onChange={(e) => setD({ ...d, name: e.target.value })}
           onBlur={() => save({})}
@@ -88,7 +95,7 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-[11.5px] text-tx-3">
         <label>
-          Conductor
+          {t('Conductor')}
           <input
             className={field}
             value={d.driver ?? ''}
@@ -97,7 +104,7 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
           />
         </label>
         <label>
-          Capacidad (kg)
+          {t('Capacidad (kg)')}
           <input
             className={field}
             type="number"
@@ -108,15 +115,15 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
           />
         </label>
         <label>
-          Jornada desde
+          {t('Jornada desde')}
           <input type="time" className={field} value={d.start} onChange={(e) => save({ start: e.target.value })} />
         </label>
         <label>
-          Hasta
+          {t('Hasta')}
           <input type="time" className={field} value={d.end} onChange={(e) => save({ end: e.target.value })} />
         </label>
         <label>
-          Coste por km (€)
+          {t('Coste por km (€)')}
           <input
             className={field}
             type="number"
@@ -135,7 +142,7 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
               d.electric ? 'border-ac/40 bg-ac-soft text-ac' : 'border-line text-tx-3'
             )}
           >
-            <Zap size={12} /> Eléctrico
+            <Zap size={12} /> {t('Eléctrico')}
           </button>
         </div>
       </div>
@@ -152,12 +159,12 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
               )}
             />
           </span>
-          {d.available ? 'Disponible' : 'No disponible'}
+          {d.available ? t('Disponible') : t('No disponible')}
         </button>
         <button
-          onClick={() => confirm(`¿Quitar ${d.name}?`) && api.deleteVehicle(d.id)}
+          onClick={() => confirm(t('¿Quitar {0}?', d.name)) && api.deleteVehicle(d.id)}
           className="text-tx-3 hover:text-err"
-          title="Quitar vehículo"
+          title={t('Quitar vehículo')}
         >
           <Trash2 size={13} />
         </button>
@@ -167,6 +174,7 @@ function VehicleCard({ v, index }: { v: Vehicle; index: number }) {
 }
 
 export function FleetView() {
+  const { t } = useI18n()
   const app = useUi((s) => s.app)!
   const add = (): void => {
     const n = app.vehicles.length + 1
@@ -174,7 +182,7 @@ export function FleetView() {
     while (app.vehicles.some((v) => v.id === id)) id = `${id}b`
     api.upsertVehicle({
       id,
-      name: `Furgoneta ${n}`,
+      name: t('Furgoneta {0}', n),
       capacityKg: 600,
       costPerKm: 0.25,
       electric: false,
@@ -187,8 +195,8 @@ export function FleetView() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-[980px] space-y-5 px-6 py-6">
         <div>
-          <h2 className="text-[22px] font-semibold tracking-[-0.03em]">Flota y depósito</h2>
-          <p className="mt-1 text-[13px] text-tx-2">Lo que cambies aquí se aplica al recalcular el plan.</p>
+          <h2 className="text-[22px] font-semibold tracking-[-0.03em]">{t('Flota y depósito')}</h2>
+          <p className="mt-1 text-[13px] text-tx-2">{t('Lo que cambies aquí se aplica al recalcular el plan.')}</p>
         </div>
         <DepotCard key={`${app.depot?.lat}|${app.depot?.name}`} />
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
@@ -199,7 +207,7 @@ export function FleetView() {
             onClick={add}
             className="flex min-h-[200px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-line-2 text-[13px] text-tx-2 hover:border-ac/40 hover:text-tx"
           >
-            <Plus size={18} /> Añadir vehículo
+            <Plus size={18} /> {t('Añadir vehículo')}
           </button>
         </div>
       </div>

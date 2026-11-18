@@ -8,12 +8,16 @@ import { CuentaGoogle } from './CuentaGoogle'
 import { Isotipo } from './Logo'
 import { ProviderIcon } from './ProviderIcon'
 
+import { useI18n } from '../lib/i18n'
+
 const field = 'w-full rounded-lg border border-line-2 bg-bg-1 px-3 py-2 text-[13px] outline-none focus:border-ac/50'
 
 function ProviderEditor({ id }: { id: ProviderId }) {
+  const { t, detail, locale } = useI18n()
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
   const info = PROVIDERS.find((p) => p.id === id)!
+  const providerName = id === 'custom' ? t('Compatible con OpenAI') : info.name
   const cfg = app.settings.providers[id]
   const [key, setKey] = useState('')
   const [baseURL, setBaseURL] = useState(cfg?.baseURL ?? info.defaultBaseURL ?? '')
@@ -48,22 +52,22 @@ function ProviderEditor({ id }: { id: ProviderId }) {
           <ProviderIcon id={id} size={20} />
         </span>
         <div>
-          <div className="text-[15px] font-semibold tracking-[-0.02em]">{info.name}</div>
+          <div className="text-[15px] font-semibold tracking-[-0.02em]">{providerName}</div>
           <div className="text-[12px] text-tx-3">
             {id === 'ollama'
-              ? 'Modelos en tu ordenador. Nada sale de tu máquina.'
+              ? t('Modelos en tu ordenador. Nada sale de tu máquina.')
               : id === 'custom'
-                ? 'LM Studio, vLLM, Groq, Mistral… cualquier API compatible con OpenAI.'
+                ? t('LM Studio, vLLM, Groq, Mistral… cualquier API compatible con OpenAI.')
                 : id === 'openrouter'
-                  ? 'Cientos de modelos con una sola clave.'
-                  : 'Usa tu propia clave. Pagas al proveedor, sin intermediarios.'}
+                  ? t('Cientos de modelos con una sola clave.')
+                  : t('Usa tu propia clave. Pagas al proveedor, sin intermediarios.')}
           </div>
         </div>
       </div>
 
       {info.needsBaseURL && (
         <label className="block text-[12px] text-tx-3">
-          URL del servidor
+          {t('URL del servidor')}
           <div className="mt-1 flex gap-2">
             <input className={field} value={baseURL} onChange={(e) => setBaseURL(e.target.value)} />
             <button
@@ -73,7 +77,7 @@ function ProviderEditor({ id }: { id: ProviderId }) {
               }}
               className="shrink-0 rounded-lg border border-line-2 px-3 text-[12.5px] text-tx-2 hover:text-tx"
             >
-              Conectar
+              {t('Conectar')}
             </button>
           </div>
         </label>
@@ -82,13 +86,14 @@ function ProviderEditor({ id }: { id: ProviderId }) {
       {(info.needsKey || id === 'custom') && (
         <label className="block text-[12px] text-tx-3">
           <span className="flex items-center justify-between">
-            Clave de API{!info.needsKey && ' (opcional)'}
+            {t('Clave de API')}
+            {!info.needsKey && t('(opcional)')}
             {info.keyUrl && (
               <button
                 onClick={() => api.openExternal(info.keyUrl!)}
                 className="flex items-center gap-1 text-tx-2 hover:text-tx"
               >
-                Conseguir una clave <ExternalLink size={11} />
+                {t('Conseguir una clave')} <ExternalLink size={11} />
               </button>
             )}
           </span>
@@ -98,38 +103,38 @@ function ProviderEditor({ id }: { id: ProviderId }) {
               type="password"
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              placeholder={cfg?.hasKey ? 'Guardada y cifrada en este equipo' : info.keyHint}
+              placeholder={cfg?.hasKey ? t('Guardada y cifrada en este equipo') : info.keyHint}
             />
             <button
               disabled={!key.trim()}
               onClick={async () => {
                 await api.saveProvider(id, { apiKey: key })
                 setKey('')
-                toast('Clave guardada', 'ok')
+                toast(t('Clave guardada'), 'ok')
                 load()
               }}
               className="shrink-0 rounded-lg bg-ac px-3 text-[12.5px] font-semibold text-ac-ink disabled:bg-bg-3 disabled:text-tx-3"
             >
-              Guardar
+              {t('Guardar')}
             </button>
             {cfg?.hasKey && (
               <button
                 onClick={() => api.saveProvider(id, { apiKey: null })}
                 className="shrink-0 rounded-lg border border-line-2 px-3 text-[12.5px] text-tx-2 hover:text-err"
               >
-                Quitar
+                {t('Quitar')}
               </button>
             )}
           </div>
           <span className="mt-1 flex items-center gap-1 text-[11.5px]">
-            <KeyRound size={11} /> Se cifra con el almacén seguro del sistema y nunca sale de este equipo salvo hacia{' '}
-            {info.name}.
+            <KeyRound size={11} />{' '}
+            {t('Se cifra con el almacén seguro del sistema y nunca sale de este equipo salvo hacia')} {providerName}.
           </span>
         </label>
       )}
 
       <div className="block text-[12px] text-tx-3">
-        Modelo
+        {t('Modelo')}
         <div className="mt-1 flex gap-2">
           {models.length > 0 ? (
             <select className={field} value={model} onChange={(e) => setModel(e.target.value)}>
@@ -145,54 +150,64 @@ function ProviderEditor({ id }: { id: ProviderId }) {
               className={field}
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="Nombre exacto del modelo"
+              placeholder={t('Nombre exacto del modelo')}
             />
           )}
           <button
             disabled={!model || !ready}
             onClick={async () => {
-              setTest({ ok: true, text: 'Probando…' })
+              setTest({ ok: true, text: t('Probando…') })
               const r = await api.testModel({ provider: id, model })
               setTest(
                 r.ok
-                  ? { ok: true, text: `Responde en ${((r.ms ?? 0) / 1000).toFixed(1)} s` }
-                  : { ok: false, text: r.error ?? 'Error' }
+                  ? {
+                      ok: true,
+                      text: t(
+                        'Responde en {0} s',
+                        ((r.ms ?? 0) / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })
+                      )
+                    }
+                  : { ok: false, text: r.error ? detail(r.error) : t('Error') }
               )
             }}
             className="shrink-0 rounded-lg border border-line-2 px-3 text-[12.5px] text-tx-2 hover:text-tx disabled:opacity-40"
           >
-            Probar
+            {t('Probar')}
           </button>
           <button
             disabled={!model || !ready}
             onClick={async () => {
               await api.saveSettings({ activeModel: { provider: id, model } })
-              toast(`Ahora hablas con ${model}`, 'ok')
+              toast(t('Ahora hablas con {0}', model), 'ok')
             }}
             className="shrink-0 rounded-lg bg-tx px-3 text-[12.5px] font-semibold text-bg disabled:opacity-40"
           >
-            Usar
+            {t('Usar')}
           </button>
         </div>
         {loading && (
           <span className="mt-1 flex items-center gap-1 text-[11.5px]">
-            <LoaderCircle size={11} className="animate-spin" /> Cargando modelos…
+            <LoaderCircle size={11} className="animate-spin" /> {t('Cargando modelos…')}
           </span>
         )}
         {listError && (
-          <span className="mt-1 block text-[11.5px] text-amber">No se ha podido pedir la lista: {listError}</span>
+          <span className="mt-1 block text-[11.5px] text-amber">
+            {t('No se ha podido pedir la lista:')} {detail(listError)}
+          </span>
         )}
         {test && <span className={cn('mt-1 block text-[11.5px]', test.ok ? 'text-ac' : 'text-err')}>{test.text}</span>}
       </div>
       <p className="text-[11.5px] leading-relaxed text-tx-3">
-        El planificador necesita un modelo que sepa usar herramientas. Los modelos grandes de Claude, ChatGPT y Gemini
-        van sobrados; en local, prueba qwen3 o llama3.1 de 8B o más.
+        {t(
+          'El planificador necesita un modelo que sepa usar herramientas. Los modelos grandes de Claude, ChatGPT y Gemini van sobrados; en local, prueba qwen3 o llama3.1 de 8B o más.'
+        )}
       </p>
     </div>
   )
 }
 
 function RoutingTab() {
+  const { t } = useI18n()
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
   const [s, setS] = useState({
@@ -206,34 +221,35 @@ function RoutingTab() {
       onSubmit={async (e) => {
         e.preventDefault()
         await api.saveSettings({ ...s, serviceMin: Math.max(0, Number(s.serviceMin) || 0) })
-        toast('Ajustes guardados', 'ok')
+        toast(t('Ajustes guardados'), 'ok')
       }}
     >
       <label className="block text-[12px] text-tx-3">
-        Motor de rutas (OSRM)
+        {t('Motor de rutas (OSRM)')}
         <input
           className={`${field} mt-1`}
           value={s.osrmUrl}
           onChange={(e) => setS({ ...s, osrmUrl: e.target.value })}
         />
         <span className="mt-1 block text-[11.5px] leading-relaxed">
-          Por defecto usa el servidor público de demostración de OSRM, pensado para pruebas. Para uso diario, monta el
-          tuyo con el mapa de tu país. Si no responde, la app estima las distancias en línea recta.
+          {t(
+            'Por defecto usa el servidor público de demostración de OSRM, pensado para pruebas. Para uso diario, monta el tuyo con el mapa de tu país. Si no responde, la app estima las distancias en línea recta.'
+          )}
         </span>
       </label>
       <label className="block text-[12px] text-tx-3">
-        Países para buscar direcciones
+        {t('Países para buscar direcciones')}
         <input
           className={`${field} mt-1`}
           value={s.countryCodes}
           onChange={(e) => setS({ ...s, countryCodes: e.target.value })}
         />
         <span className="mt-1 block text-[11.5px]">
-          Códigos ISO separados por comas, por ejemplo «es,pt». Vacío para todo el mundo.
+          {t('Códigos ISO separados por comas, por ejemplo «es,pt». Vacío para todo el mundo.')}
         </span>
       </label>
       <label className="block text-[12px] text-tx-3">
-        Minutos por parada
+        {t('Minutos por parada')}
         <input
           type="number"
           min={0}
@@ -242,12 +258,13 @@ function RoutingTab() {
           onChange={(e) => setS({ ...s, serviceMin: Number(e.target.value) })}
         />
       </label>
-      <button className="rounded-lg bg-ac px-4 py-2 text-[12.5px] font-semibold text-ac-ink">Guardar</button>
+      <button className="rounded-lg bg-ac px-4 py-2 text-[12.5px] font-semibold text-ac-ink">{t('Guardar')}</button>
     </form>
   )
 }
 
 function AboutTab() {
+  const { t } = useI18n()
   const [info, setInfo] = useState<{ version: string } | null>(null)
   useEffect(() => {
     api.appInfo().then(setInfo)
@@ -263,21 +280,23 @@ function AboutTab() {
         <Isotipo size={36} live className="text-tx" />
         <div>
           <div className="text-[16px] font-semibold tracking-[-0.02em] text-tx">OpenRoute {info?.version}</div>
-          <div className="text-[12px] text-tx-3">Código abierto con licencia Apache 2.0</div>
+          <div className="text-[12px] text-tx-3">{t('Código abierto con licencia Apache 2.0')}</div>
         </div>
       </div>
       <p className="leading-relaxed">
-        Planifica las rutas de reparto de tu flota en tu ordenador. Los pedidos y el plan se guardan solo en este
-        equipo; al modelo de IA le llega lo que haga falta para responderte.
+        {t(
+          'Planifica las rutas de reparto de tu flota en tu ordenador. Los pedidos y el plan se guardan solo en este equipo; al modelo de IA le llega lo que haga falta para responderte.'
+        )}
       </p>
       <p className="leading-relaxed">
-        Mapa: © colaboradores de {link('https://www.openstreetmap.org/copyright', 'OpenStreetMap')}, teselas de{' '}
-        {link('https://openfreemap.org', 'OpenFreeMap')}. Rutas: {link('https://project-osrm.org', 'OSRM')}.
-        Direcciones: {link('https://nominatim.org', 'Nominatim')}. Iconos de proveedores:{' '}
-        {link('https://github.com/lobehub/lobe-icons', 'LobeHub')} (MIT).
+        {t('Mapa: © colaboradores de')} {link('https://www.openstreetmap.org/copyright', 'OpenStreetMap')}
+        {t(', teselas de')} {link('https://openfreemap.org', 'OpenFreeMap')}
+        {t('. Rutas:')} {link('https://project-osrm.org', 'OSRM')}
+        {t('. Direcciones:')} {link('https://nominatim.org', 'Nominatim')}
+        {t('. Iconos de proveedores:')} {link('https://github.com/lobehub/lobe-icons', 'LobeHub')} (MIT).
       </p>
       <div className="flex gap-4">
-        {link('https://github.com/ComunidadIA-OS/OpenRoute', 'Código en GitHub')}
+        {link('https://github.com/ComunidadIA-OS/OpenRoute', t('Código en GitHub'))}
         {link('https://openroute.es', 'openroute.es')}
       </div>
     </div>
@@ -285,7 +304,8 @@ function AboutTab() {
 }
 
 export function SettingsDialog() {
-  const { settingsOpen, settingsTab, closeSettings, openSettings } = useUi()
+  const { t, language } = useI18n()
+  const { settingsOpen, settingsTab, closeSettings, openSettings, toast } = useUi()
   const app = useUi((s) => s.app)!
   const [provider, setProvider] = useState<ProviderId>(app.settings.activeModel?.provider ?? 'anthropic')
   if (!settingsOpen) return null
@@ -299,14 +319,14 @@ export function SettingsDialog() {
         className="fade-up flex h-[600px] w-[860px] overflow-hidden rounded-2xl border border-line-2 bg-bg shadow-[0_40px_120px_-30px_rgba(0,0,0,0.9)]"
       >
         <nav className="w-[200px] shrink-0 border-r border-line bg-bg-1 p-3">
-          <div className="px-2 pb-3 pt-1 text-[15px] font-semibold tracking-[-0.02em]">Ajustes</div>
+          <div className="px-2 pb-3 pt-1 text-[15px] font-semibold tracking-[-0.02em]">{t('Ajustes')}</div>
           {(
             [
-              ['models', 'Modelos de IA'],
-              ['cli', 'Terminales de IA'],
-              ['routing', 'Mapa y rutas'],
-              ['account', 'Cuenta'],
-              ['about', 'Acerca de']
+              ['models', t('Modelos de IA')],
+              ['cli', t('Terminales de IA')],
+              ['routing', t('Mapa y rutas')],
+              ['account', t('Cuenta')],
+              ['about', t('Acerca de')]
             ] as const
           ).map(([k, label]) => (
             <button
@@ -320,18 +340,39 @@ export function SettingsDialog() {
               {label}
             </button>
           ))}
+          <label className="mt-4 block px-2.5 text-[12px] text-tx-3">
+            {t('Idioma')}
+            <select
+              className={`${field} mt-1`}
+              value={language}
+              onChange={(event) => {
+                const selected = event.target.value === 'en' ? 'en' : 'es'
+                void api
+                  .saveSettings({ language: selected })
+                  .catch(() => toast(t('No se pudo cambiar el idioma.'), 'error'))
+              }}
+            >
+              <option value="es" lang="es">
+                Español
+              </option>
+              <option value="en" lang="en">
+                English
+              </option>
+            </select>
+          </label>
         </nav>
         <div className="relative flex min-w-0 flex-1 flex-col">
           <button
             onClick={closeSettings}
             className="absolute right-3 top-3 rounded-lg p-1.5 text-tx-3 hover:bg-bg-2 hover:text-tx"
+            aria-label={t('Cerrar ajustes')}
           >
             <X size={16} />
           </button>
           {settingsTab === 'models' && (
             <div className="flex min-h-0 flex-1">
               <div className="w-[230px] shrink-0 space-y-1 overflow-y-auto border-r border-line p-3 pt-12">
-                <div className="px-1 pb-2 text-[12px] text-tx-3">Trae tu propio modelo</div>
+                <div className="px-1 pb-2 text-[12px] text-tx-3">{t('Trae tu propio modelo')}</div>
                 {PROVIDERS.map((p) => {
                   const cfg = app.settings.providers[p.id]
                   const connected = p.needsKey ? cfg?.hasKey : p.id === 'ollama' || Boolean(cfg?.hasKey)
@@ -349,14 +390,16 @@ export function SettingsDialog() {
                         <ProviderIcon id={p.id} size={15} />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px]">{p.name}</span>
+                        <span className="block truncate text-[13px]">
+                          {p.id === 'custom' ? t('Compatible con OpenAI') : p.name}
+                        </span>
                         <span className={cn('block text-[11px]', active ? 'text-ac' : 'text-tx-3')}>
                           {active
-                            ? 'En uso'
+                            ? t('En uso')
                             : connected && p.needsKey
-                              ? 'Clave guardada'
+                              ? t('Clave guardada')
                               : p.needsKey
-                                ? 'Sin clave'
+                                ? t('Sin clave')
                                 : 'Local'}
                         </span>
                       </span>

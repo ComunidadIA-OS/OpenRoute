@@ -2,8 +2,11 @@ import { FileSpreadsheet, MapPinOff, Plus, Search, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { toHHMM } from '@core/time'
 import type { Order, Priority } from '@core/types'
+import { localizeUnassignedReason } from '@core/route-language'
 import { cn, priorityLabel, routeColor } from '../lib/format'
 import { api, useUi } from '../store'
+
+import { useI18n } from '../lib/i18n'
 
 const PRIORITY_STYLE: Record<Priority, string> = {
   3: 'bg-err/12 text-err',
@@ -12,6 +15,7 @@ const PRIORITY_STYLE: Record<Priority, string> = {
 }
 
 function AddOrder({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n()
   const toast = useUi((s) => s.toast)
   const [f, setF] = useState({
     customer: '',
@@ -36,13 +40,13 @@ function AddOrder({ onClose }: { onClose: () => void }) {
           windowEnd: f.windowEnd,
           priority: Number(f.priority) as Priority
         })
-        toast('Pedido añadido. Se ubicará en el mapa al calcular.', 'ok')
+        toast(t('Pedido añadido. Se ubicará en el mapa al calcular.'), 'ok')
         onClose()
       }}
       className="fade-up grid grid-cols-[1.2fr_2fr_0.6fr_0.6fr_0.6fr_0.7fr_auto] items-end gap-2 border-b border-line bg-bg-1 px-5 py-3"
     >
       <label className="text-[11.5px] text-tx-3">
-        Cliente
+        {t('Cliente')}
         <input
           autoFocus
           className={input}
@@ -51,7 +55,7 @@ function AddOrder({ onClose }: { onClose: () => void }) {
         />
       </label>
       <label className="text-[11.5px] text-tx-3">
-        Dirección
+        {t('Dirección')}
         <input
           className={input}
           required
@@ -61,11 +65,11 @@ function AddOrder({ onClose }: { onClose: () => void }) {
         />
       </label>
       <label className="text-[11.5px] text-tx-3">
-        Kg
+        {t('Kg')}
         <input className={input} value={f.weightKg} onChange={(e) => setF({ ...f, weightKg: e.target.value })} />
       </label>
       <label className="text-[11.5px] text-tx-3">
-        Desde
+        {t('Desde')}
         <input
           type="time"
           className={input}
@@ -74,7 +78,7 @@ function AddOrder({ onClose }: { onClose: () => void }) {
         />
       </label>
       <label className="text-[11.5px] text-tx-3">
-        Hasta
+        {t('Hasta')}
         <input
           type="time"
           className={input}
@@ -83,11 +87,11 @@ function AddOrder({ onClose }: { onClose: () => void }) {
         />
       </label>
       <label className="text-[11.5px] text-tx-3">
-        Prioridad
+        {t('Prioridad')}
         <select className={input} value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>
-          <option value="3">Alta</option>
-          <option value="2">Media</option>
-          <option value="1">Baja</option>
+          <option value="3">{t('Alta')}</option>
+          <option value="2">{t('Media')}</option>
+          <option value="1">{t('Baja')}</option>
         </select>
       </label>
       <div className="flex gap-1.5">
@@ -96,15 +100,16 @@ function AddOrder({ onClose }: { onClose: () => void }) {
           onClick={onClose}
           className="rounded-lg px-3 py-1.5 text-[12.5px] text-tx-2 hover:text-tx"
         >
-          Cancelar
+          {t('Cancelar')}
         </button>
-        <button className="rounded-lg bg-ac px-3 py-1.5 text-[12.5px] font-semibold text-ac-ink">Añadir</button>
+        <button className="rounded-lg bg-ac px-3 py-1.5 text-[12.5px] font-semibold text-ac-ink">{t('Añadir')}</button>
       </div>
     </form>
   )
 }
 
 export function OrdersView() {
+  const { t, language } = useI18n()
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
   const [q, setQ] = useState('')
@@ -131,36 +136,43 @@ export function OrdersView() {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar pedidos"
+            placeholder={t('Buscar pedidos')}
+            aria-label={t('Buscar pedidos')}
             className="w-full bg-transparent text-[13px] text-tx outline-none placeholder:text-tx-3"
           />
         </label>
-        <span className="text-[12.5px] text-tx-3">{session.orders.length} pedidos</span>
+        <span className="text-[12.5px] text-tx-3">
+          {t(session.orders.length === 1 ? '{0} pedido' : '{0} pedidos', session.orders.length)}
+        </span>
         <div className="ml-auto flex gap-2">
           <button
             onClick={async () => {
               const r = await api.importOrders()
               if (r)
                 toast(
-                  `${r.added} pedidos importados${r.errors.length ? ` · ${r.errors.length} con error` : ''}`,
+                  t(
+                    '{0} pedidos importados{1}',
+                    r.added,
+                    r.errors.length ? t(' · {0} con error', r.errors.length) : ''
+                  ),
                   r.errors.length ? 'error' : 'ok'
                 )
             }}
             className="flex items-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-[12.5px] text-tx-2 hover:text-tx"
           >
-            <FileSpreadsheet size={13} /> Importar
+            <FileSpreadsheet size={13} /> {t('Importar')}
           </button>
           <button
             onClick={() => setAdding(true)}
             className="flex items-center gap-1.5 rounded-lg bg-ac px-3 py-1.5 text-[12.5px] font-semibold text-ac-ink"
           >
-            <Plus size={13} /> Pedido
+            <Plus size={13} /> {t('Pedido')}
           </button>
           {session.orders.length > 0 && (
             <button
-              onClick={() => confirm('¿Quitar todos los pedidos de este reparto?') && api.clearOrders()}
+              onClick={() => confirm(t('¿Quitar todos los pedidos de este reparto?')) && api.clearOrders()}
               className="rounded-lg px-2 py-1.5 text-tx-3 hover:text-err"
-              title="Quitar todos"
+              title={t('Quitar todos')}
             >
               <Trash2 size={14} />
             </button>
@@ -172,7 +184,17 @@ export function OrdersView() {
         <table className="w-full border-collapse text-[12.5px]">
           <thead className="sticky top-0 z-10 bg-bg">
             <tr className="text-left text-tx-3">
-              {['Pedido', 'Cliente', 'Dirección', 'Franja', 'Kg', 'Prioridad', 'Ruta', 'Llegada', ''].map((h) => (
+              {[
+                t('Pedido'),
+                t('Cliente'),
+                t('Dirección'),
+                t('Franja'),
+                t('Kg'),
+                t('Prioridad'),
+                t('Ruta'),
+                t('Llegada'),
+                ''
+              ].map((h) => (
                 <th key={h} className="whitespace-nowrap border-b border-line px-3 py-2 font-normal first:pl-5">
                   {h}
                 </th>
@@ -213,7 +235,7 @@ export function OrdersView() {
                     >
                       {([3, 2, 1] as Priority[]).map((p) => (
                         <option key={p} value={p} className="bg-bg-2 text-tx">
-                          {priorityLabel[p]}
+                          {t(priorityLabel[p])}
                         </option>
                       ))}
                     </select>
@@ -228,8 +250,8 @@ export function OrdersView() {
                         {w.vehicleId}
                       </span>
                     ) : unassigned ? (
-                      <span className="text-err" title={unassigned.reason}>
-                        Sin asignar
+                      <span className="text-err" title={localizeUnassignedReason(unassigned.reason, language)}>
+                        {t('Sin asignar')}
                       </span>
                     ) : (
                       <span className="text-tx-3">—</span>
@@ -242,7 +264,7 @@ export function OrdersView() {
                     <button
                       onClick={() => api.deleteOrder(o.id)}
                       className="invisible text-tx-3 hover:text-err group-hover:visible"
-                      title="Quitar"
+                      title={t('Quitar')}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -253,7 +275,9 @@ export function OrdersView() {
           </tbody>
         </table>
         {rows.length === 0 && (
-          <div className="p-10 text-center text-[13px] text-tx-3">No hay pedidos{q ? ' con ese filtro' : ''}.</div>
+          <div className="p-10 text-center text-[13px] text-tx-3">
+            {t(q ? 'No hay pedidos con ese filtro.' : 'No hay pedidos.')}
+          </div>
         )}
       </div>
     </div>

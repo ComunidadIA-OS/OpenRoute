@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react'
 
+import { useI18n } from '../lib/i18n'
+
 const STORAGE_KEY = 'openroute:first-run-tour:v1'
 const STEPS = [
   {
@@ -25,7 +27,7 @@ const STEPS = [
     description:
       'Si conectas un modelo, puedes pedirle cambios o explicaciones. También puedes calcular las rutas desde el mapa.'
   }
-]
+] as const
 
 export function hasSeenTour(): boolean {
   try {
@@ -44,6 +46,7 @@ export function rememberTour(): void {
 }
 
 export function FirstRunTour({ onClose }: { onClose: () => void }) {
+  const { t } = useI18n()
   const [index, setIndex] = useState(0)
   const [target, setTarget] = useState<DOMRect | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -111,13 +114,13 @@ export function FirstRunTour({ onClose }: { onClose: () => void }) {
         style={panelPosition}
       >
         <p id="tour-progress" className="text-xs text-tx-3">
-          Paso {index + 1} de {STEPS.length}
+          {t('Paso {0} de {1}', index + 1, STEPS.length)}
         </p>
         <h2 id="tour-heading" ref={heading} tabIndex={-1} className="mt-2 text-base font-semibold">
-          {step.title}
+          {t(step.title)}
         </h2>
         <p id="tour-description" className="mt-2 text-sm leading-relaxed text-tx-2">
-          {step.description}
+          {t(step.description)}
         </p>
         <div className="mt-5 flex items-center justify-between gap-3">
           <button
@@ -125,14 +128,14 @@ export function FirstRunTour({ onClose }: { onClose: () => void }) {
             onClick={dismiss}
             className="rounded-md px-2 py-1.5 text-sm text-tx-2 hover:text-tx focus-visible:outline-ac"
           >
-            Omitir
+            {t('Omitir')}
           </button>
           <button
             type="button"
             onClick={isLast ? dismiss : () => setIndex((current) => current + 1)}
             className="rounded-md bg-ac px-3 py-1.5 text-sm font-semibold text-ac-ink focus-visible:outline-ac"
           >
-            {isLast ? 'Entendido' : 'Siguiente'}
+            {isLast ? t('Entendido') : t('Siguiente')}
           </button>
         </div>
       </div>

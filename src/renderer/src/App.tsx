@@ -12,13 +12,18 @@ import { Sidebar } from './components/Sidebar'
 import { cn } from './lib/format'
 import { api, useUi, type View } from './store'
 
-const TABS: { id: View; label: string; icon: typeof MapIcon }[] = [
+import { rememberLanguage, useI18n } from './lib/i18n'
+import type { Message } from './lib/messages'
+import type { BusyState } from '@shared/types'
+
+const TABS: { id: View; label: Message; icon: typeof MapIcon }[] = [
   { id: 'map', label: 'Mapa', icon: MapIcon },
   { id: 'orders', label: 'Pedidos', icon: Table2 },
   { id: 'fleet', label: 'Flota', icon: Truck }
 ]
 
 function SessionTitle({ id, title }: { id: string; title: string }) {
+  const { t } = useI18n()
   const [value, setValue] = useState<string | null>(null)
   const restoreFocus = useRef(false)
   const toast = useUi((s) => s.toast)
@@ -28,14 +33,14 @@ function SessionTitle({ id, title }: { id: string; title: string }) {
     setValue(null)
     const name = value?.trim()
     if (save && name && name !== title) {
-      void api.renameSession(id, name).catch(() => toast('No se pudo renombrar el reparto.', 'error'))
+      void api.renameSession(id, name).catch(() => toast(t('No se pudo renombrar el reparto.'), 'error'))
     }
   }
 
   return value !== null ? (
     <input
       autoFocus
-      aria-label="Nombre del reparto"
+      aria-label={t('Nombre del reparto')}
       maxLength={80}
       value={value}
       onChange={(e) => setValue(e.target.value)}
@@ -60,20 +65,29 @@ function SessionTitle({ id, title }: { id: string; title: string }) {
       }}
       onClick={() => setValue(title)}
       className="no-drag max-w-[360px] truncate text-[13px] font-medium text-tx focus-visible:outline-ac"
-      aria-label={`Renombrar reparto: ${title}`}
+      aria-label={t('Renombrar reparto: {0}', title)}
     >
       {title}
     </button>
   )
 }
 
+const busyMessages: Record<BusyState['stage'], Message> = {
+  geocoding: 'Buscando direcciones',
+  matrix: 'Calculando distancias por calles',
+  solving: 'Optimizando rutas',
+  geometry: 'Dibujando rutas por calles',
+  exporting: 'Preparando la exportación'
+}
+
 function BusyPill() {
+  const { t, language } = useI18n()
   const busy = useUi((s) => s.app?.busy)
   if (!busy) return null
   return (
     <div className="panel fade-up absolute left-1/2 top-4 z-20 flex -translate-x-1/2 items-center gap-2.5 overflow-hidden rounded-full py-2 pl-3 pr-4 text-[12.5px]">
       <LoaderCircle size={14} className="animate-spin text-ac" />
-      {busy.label}
+      {language === 'es' ? busy.label : t(busyMessages[busy.stage])}
       {busy.total ? (
         <span className="tabular-nums text-tx-3">
           {busy.done ?? 0}/{busy.total}
@@ -106,6 +120,7 @@ function Toasts() {
 }
 
 export function App() {
+  const { t, language } = useI18n()
   const { app, view, setView, sidebarOpen, toggleSidebar, setApp, applyChat } = useUi()
 
   const [loadFailed, setLoadFailed] = useState(false)
@@ -143,13 +158,19 @@ export function App() {
     }
   }, [setApp, applyChat, loadAttempt])
 
+  const hasSettings = app !== null
+  useEffect(() => {
+    document.documentElement.lang = language
+    if (hasSettings) rememberLanguage(language)
+  }, [hasSettings, language])
+
   if (!app) {
     return (
       <main className="grain flex h-full items-center justify-center bg-bg p-6 text-center">
         {loadFailed ? (
           <div>
             <h1 role="alert" className="text-base font-medium text-tx">
-              No se pudo abrir OpenRoute.
+              {t('No se pudo abrir OpenRoute.')}
             </h1>
             <button
               type="button"
@@ -159,13 +180,13 @@ export function App() {
               }}
               className="mt-4 rounded-lg border border-line-2 bg-bg-2 px-3 py-1.5 text-sm text-tx hover:bg-bg-3 focus-visible:outline-ac"
             >
-              Reintentar
+              {t('Reintentar')}
             </button>
           </div>
         ) : (
           <p role="status" className="flex items-center gap-2 text-sm text-tx-2">
             <LoaderCircle aria-hidden="true" size={16} className="animate-spin text-ac" />
-            Abriendo OpenRoute…
+            {t('Abriendo OpenRoute…')}
           </p>
         )}
       </main>
@@ -189,26 +210,31 @@ export function App() {
             <button
               onClick={toggleSidebar}
               className="rounded-md p-1 text-tx-3 hover:bg-bg-3 hover:text-tx"
-              title="Mostrar barra lateral"
+              title={t('Mostrar barra lateral')}
             >
               <PanelLeftOpen size={15} />
             </button>
           )}
           {session && <SessionTitle key={session.id} id={session.id} title={session.title} />}
-          <span className="text-[12px] text-tx-3">{session?.orders.length ?? 0} pedidos</span>
-          <nav className="ml-auto flex items-center gap-0.5 rounded-lg border border-line bg-bg-1 p-0.5">
-            {TABS.map((t) => (
+          <span className="text-[12px] text-tx-3">
+            {t(session?.orders.length === 1 ? '{0} pedido' : '{0} pedidos', session?.orders.length ?? 0)}
+          </span>
+          <nav
+            aria-label={t('Navegación principal')}
+            className="ml-auto flex items-center gap-0.5 rounded-lg border border-line bg-bg-1 p-0.5"
+          >
+            {TABS.map((tabs) => (
               <button
-                key={t.id}
-                data-tour={t.id}
-                onClick={() => setView(t.id)}
+                key={tabs.id}
+                data-tour={tabs.id}
+                onClick={() => setView(tabs.id)}
                 className={cn(
                   'flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px]',
-                  view === t.id ? 'bg-bg-3 text-tx' : 'text-tx-3 hover:text-tx'
+                  view === tabs.id ? 'bg-bg-3 text-tx' : 'text-tx-3 hover:text-tx'
                 )}
               >
-                <t.icon size={13} />
-                {t.label}
+                <tabs.icon size={13} />
+                {t(tabs.label)}
               </button>
             ))}
           </nav>
@@ -217,8 +243,8 @@ export function App() {
             type="button"
             onClick={() => setTourOpen(true)}
             className="no-drag rounded-md p-1.5 text-tx-3 hover:bg-bg-3 hover:text-tx focus-visible:outline-ac"
-            aria-label="Abrir guía de inicio"
-            title="Guía de inicio"
+            aria-label={t('Abrir guía de inicio')}
+            title={t('Guía de inicio')}
           >
             <CircleHelp aria-hidden="true" size={16} />
           </button>

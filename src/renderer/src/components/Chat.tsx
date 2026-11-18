@@ -9,14 +9,30 @@ import { api, useUi } from '../store'
 import { Isotipo } from './Logo'
 import { ProviderIcon } from './ProviderIcon'
 
+import type { Message as MessageKey } from '../lib/messages'
+import { useI18n } from '../lib/i18n'
+
 const SUGGESTIONS = [
   'Planifica el reparto de hoy',
   '¿Qué pedidos urgentes hay y a qué hora llegan?',
   'La furgoneta diésel está en el taller. Replanifica sin ella',
   'Pásame la ruta de Lucía para mandársela por WhatsApp'
-]
+] as const
+
+const toolLabels: Partial<Record<string, MessageKey>> = {
+  get_overview: 'Revisando la operación',
+  list_orders: 'Consultando pedidos',
+  plan_routes: 'Calculando rutas',
+  move_order: 'Moviendo pedido',
+  set_vehicle: 'Actualizando la flota',
+  add_order: 'Añadiendo pedido',
+  remove_order: 'Quitando pedido',
+  get_route: 'Abriendo ruta'
+}
 
 function ToolRow({ part }: { part: Extract<ChatPart, { type: 'tool' }> }) {
+  const { t, detail } = useI18n()
+  const label = toolLabels[part.name]
   return (
     <div className="flex items-center gap-2 py-0.5 text-[12.5px]">
       <span className="flex h-4 w-4 items-center justify-center">
@@ -24,13 +40,14 @@ function ToolRow({ part }: { part: Extract<ChatPart, { type: 'tool' }> }) {
         {part.status === 'done' && <Check size={13} className="text-ac" />}
         {part.status === 'error' && <X size={13} className="text-err" />}
       </span>
-      <span className={part.status === 'running' ? 'text-tx' : 'text-tx-2'}>{part.label}</span>
-      {part.detail && <span className="truncate text-tx-3">{part.detail}</span>}
+      <span className={part.status === 'running' ? 'text-tx' : 'text-tx-2'}>{label ? t(label) : part.label}</span>
+      {part.detail && <span className="truncate text-tx-3">{detail(part.detail)}</span>}
     </div>
   )
 }
 
 function Message({ m, streaming }: { m: ChatMessage; streaming: boolean }) {
+  const { t, detail } = useI18n()
   if (m.role === 'user') {
     const text = m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')
     return (
@@ -72,17 +89,20 @@ function Message({ m, streaming }: { m: ChatMessage; streaming: boolean }) {
       )}
       {streaming && m.parts.length === 0 && (
         <div className="flex items-center gap-2 text-[12.5px] text-tx-3">
-          <LoaderCircle size={13} className="animate-spin text-ac" /> Pensando
+          <LoaderCircle size={13} className="animate-spin text-ac" /> {t('Pensando')}
         </div>
       )}
       {m.error && (
-        <div className="rounded-xl border border-err/30 bg-err/10 px-3 py-2 text-[12.5px] text-err">{m.error}</div>
+        <div className="rounded-xl border border-err/30 bg-err/10 px-3 py-2 text-[12.5px] text-err">
+          {detail(m.error)}
+        </div>
       )}
     </div>
   )
 }
 
 function ModelPicker() {
+  const { t } = useI18n()
   const app = useUi((s) => s.app)!
   const openSettings = useUi((s) => s.openSettings)
   const [open, setOpen] = useState(false)
@@ -108,7 +128,7 @@ function ModelPicker() {
         className="flex max-w-[210px] items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-tx-2 hover:bg-bg-3 hover:text-tx"
       >
         {model ? <ProviderIcon id={model.provider} size={13} /> : null}
-        <span className="truncate">{model ? model.model : 'Elegir modelo'}</span>
+        <span className="truncate">{model ? model.model : t('Elegir modelo')}</span>
         <ChevronDown size={12} />
       </button>
       {open && (
@@ -118,7 +138,7 @@ function ModelPicker() {
             {configured.map((p) => (
               <div key={p.id} className="pb-1">
                 <div className="flex items-center gap-1.5 px-2 pb-1 pt-1.5 text-[11.5px] text-tx-3">
-                  <ProviderIcon id={p.id} size={12} /> {p.name}
+                  <ProviderIcon id={p.id} size={12} /> {p.id === 'custom' ? t('Compatible con OpenAI') : p.name}
                 </div>
                 {(lists[p.id] ?? []).map((m) => {
                   const on = model?.provider === p.id && model.model === m
@@ -139,7 +159,7 @@ function ModelPicker() {
                     </button>
                   )
                 })}
-                {!lists[p.id] && <div className="px-2 py-1 text-[12px] text-tx-3">Cargando…</div>}
+                {!lists[p.id] && <div className="px-2 py-1 text-[12px] text-tx-3">{t('Cargando…')}</div>}
               </div>
             ))}
             <button
@@ -149,7 +169,7 @@ function ModelPicker() {
               }}
               className="mt-1 w-full rounded-lg border-t border-line px-2 py-2 text-left text-[12.5px] text-tx-2 hover:text-tx"
             >
-              Configurar modelos…
+              {t('Configurar modelos…')}
             </button>
           </div>
         </>
@@ -159,6 +179,7 @@ function ModelPicker() {
 }
 
 export function Chat() {
+  const { t } = useI18n()
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
   const openSettings = useUi((s) => s.openSettings)
@@ -196,7 +217,7 @@ export function Chat() {
     const r = await api.importOrders()
     if (r)
       toast(
-        `${r.added} pedidos importados${r.errors.length ? ` · ${r.errors.length} filas con error` : ''}`,
+        t('{0} pedidos importados{1}', r.added, r.errors.length ? t(' · {0} filas con error', r.errors.length) : ''),
         r.errors.length ? 'error' : 'ok'
       )
   }
@@ -207,18 +228,18 @@ export function Chat() {
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Isotipo size={44} live className="text-tx" />
-            <h2 className="mt-5 text-[22px] font-semibold tracking-[-0.03em]">¿Qué repartimos hoy?</h2>
+            <h2 className="mt-5 text-[22px] font-semibold tracking-[-0.03em]">{t('¿Qué repartimos hoy?')}</h2>
             <p className="mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-tx-2">
-              Pídelo con tus palabras. La IA entiende; las rutas las calcula el motor.
+              {t('Pídelo con tus palabras. La IA entiende; las rutas las calcula el motor.')}
             </p>
             <div className="mt-6 flex w-full max-w-[340px] flex-col gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
-                  onClick={() => send(s)}
+                  onClick={() => send(t(s))}
                   className="rounded-xl border border-line px-3 py-2 text-left text-[12.5px] text-tx-2 transition hover:border-line-2 hover:bg-bg-2 hover:text-tx"
                 >
-                  {s}
+                  {t(s)}
                 </button>
               ))}
             </div>
@@ -227,7 +248,7 @@ export function Chat() {
                 onClick={() => openSettings('models')}
                 className="mt-5 flex items-center gap-2 rounded-full bg-ac px-4 py-2 text-[13px] font-semibold text-ac-ink hover:brightness-105"
               >
-                Conecta tu modelo
+                {t('Conecta tu modelo')}
               </button>
             )}
           </div>
@@ -253,14 +274,15 @@ export function Chat() {
               }
             }}
             rows={1}
-            placeholder="Pide un plan, un cambio o una ruta…"
+            aria-label={t('Mensaje al planificador')}
+            placeholder={t('Pide un plan, un cambio o una ruta…')}
             className="block w-full resize-none bg-transparent px-4 pb-1 pt-3.5 text-[13.5px] text-tx outline-none placeholder:text-tx-3"
           />
           <div className="flex items-center justify-between px-2 pb-2">
             <button
               onClick={importFile}
               className="rounded-lg p-1.5 text-tx-3 hover:bg-bg-3 hover:text-tx"
-              title="Importar pedidos (CSV o Excel)"
+              title={t('Importar pedidos (CSV o Excel)')}
             >
               <Paperclip size={15} />
             </button>
@@ -270,7 +292,7 @@ export function Chat() {
                 <button
                   onClick={() => api.stopChat()}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-tx text-bg"
-                  title="Parar"
+                  title={t('Parar')}
                 >
                   <Square size={11} fill="currentColor" />
                 </button>
@@ -279,7 +301,7 @@ export function Chat() {
                   onClick={() => send()}
                   disabled={!text.trim()}
                   className="flex h-7 w-7 items-center justify-center rounded-full bg-ac text-ac-ink transition disabled:bg-bg-3 disabled:text-tx-3"
-                  title="Enviar"
+                  title={t('Enviar')}
                 >
                   <ArrowUp size={15} strokeWidth={2.4} />
                 </button>

@@ -22,7 +22,9 @@ function requireKey(id: ProviderId): string {
   const key = store.getSecret(id)
   if (!key) {
     const name = PROVIDERS.find((p) => p.id === id)?.name ?? id
-    throw new Error(ui(`Falta la clave de ${name}. Añádela en Ajustes.`, `The ${name} key is missing. Add it in Settings.`))
+    throw new Error(
+      ui(`Falta la clave de ${name}. Añádela en Ajustes.`, `The ${name} key is missing. Add it in Settings.`)
+    )
   }
   return key
 }
