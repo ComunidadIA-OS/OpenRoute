@@ -91,10 +91,7 @@ export function FirstRunTour({ onClose }: { onClose: () => void }) {
       ref={dialog}
       aria-labelledby="tour-heading"
       aria-describedby="tour-progress tour-description"
-      onCancel={(event) => {
-        event.preventDefault()
-        dismiss()
-      }}
+      onCancel={(event) => event.preventDefault()}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overflow-hidden border-0 bg-transparent text-tx backdrop:bg-black/35"
     >
       {target && (
