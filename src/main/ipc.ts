@@ -12,6 +12,7 @@ import type { ChatEvent, ImportReport, ModelRef, ProviderId, Settings } from '..
 import { sendMessage, stopChat, testModel } from './ai/agent'
 import { listModels } from './ai/providers'
 import { planCsv, planPdf } from './export'
+import { cancelGoogleSignIn, clearGoogleAccount, startGoogleSignIn } from './google-account'
 import { invalidatePlan, moveOrder, planSession } from './planner'
 import { runtime, setBusy, snapshot } from './runtime'
 import { geocode } from './services/geocode'
@@ -271,6 +272,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
   handle('provider:models', (id: ProviderId) => listModels(id))
   handle('model:test', (ref: ModelRef) => testModel(ref))
+
+  handle('google:sign-in', startGoogleSignIn)
+  handle('google:cancel', cancelGoogleSignIn)
+  handle('google:sign-out', clearGoogleAccount)
 
   handle('app:open', (url: string) => {
     if (/^https:\/\//.test(url)) return shell.openExternal(url)

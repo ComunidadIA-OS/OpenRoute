@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from '
 import { join } from 'node:path'
 import type { ModelMessage } from 'ai'
 import type { Depot, Order, Plan, Vehicle } from '../core/types'
-import type { ChatMessage, ProviderId, Settings } from '../shared/types'
+import type { ChatMessage, GoogleProfile, ProviderId, Settings } from '../shared/types'
 import { PROVIDERS } from '../shared/types'
 
 export interface Session {
@@ -30,6 +30,7 @@ interface Persisted {
   sessions: Session[]
   activeId: string | null
   settings: Settings
+  googleProfile: GoogleProfile | null
   /** Claves cifradas en base64, por proveedor. */
   secrets: Partial<Record<ProviderId, string>>
 }
@@ -82,6 +83,7 @@ class Store extends EventEmitter {
       sessions: [],
       activeId: null,
       settings: defaultSettings(),
+      googleProfile: null,
       secrets: {}
     }
     if (existsSync(this.file)) {

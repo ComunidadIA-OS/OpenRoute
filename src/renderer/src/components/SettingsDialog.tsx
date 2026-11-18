@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { PROVIDERS, type ProviderId } from '@shared/types'
 import { cn } from '../lib/format'
 import { api, useUi } from '../store'
+import { CuentaGoogle } from './CuentaGoogle'
 import { Isotipo } from './Logo'
 import { ProviderIcon } from './ProviderIcon'
 
@@ -302,6 +303,7 @@ export function SettingsDialog() {
             [
               ['models', 'Modelos de IA'],
               ['routing', 'Mapa y rutas'],
+              ['account', 'Cuenta'],
               ['about', 'Acerca de']
             ] as const
           ).map(([k, label]) => (
@@ -369,6 +371,11 @@ export function SettingsDialog() {
           {settingsTab === 'routing' && (
             <div className="overflow-y-auto p-6 pt-12">
               <RoutingTab />
+            </div>
+          )}
+          {settingsTab === 'account' && (
+            <div className="overflow-y-auto p-6 pt-12">
+              <CuentaGoogle />
             </div>
           )}
           {settingsTab === 'about' && (

@@ -46,6 +46,10 @@ const api: OpenRouteApi = {
   listModels: (id) => invoke('provider:models', id),
   testModel: (ref) => invoke('model:test', ref),
 
+  signInWithGoogle: () => invoke('google:sign-in'),
+  cancelGoogleSignIn: () => invoke('google:cancel'),
+  signOutGoogle: () => invoke('google:sign-out'),
+
   openExternal: (url) => invoke('app:open', url),
   appInfo: () => invoke('app:info')
 }

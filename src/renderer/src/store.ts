@@ -13,7 +13,7 @@ interface UiState {
   app: AppState | null
   view: View
   settingsOpen: boolean
-  settingsTab: 'models' | 'routing' | 'about'
+  settingsTab: 'models' | 'routing' | 'account' | 'about'
   focusVehicle: string | null
   sidebarOpen: boolean
   toasts: Toast[]

@@ -1,6 +1,7 @@
 // Estado efímero (no se guarda en disco) y la vista que recibe la interfaz.
 
 import type { AppState, BusyState } from '../shared/types'
+import { googleAccountSnapshot } from './google-account'
 import { store } from './store'
 
 export const runtime: { busy: BusyState | null; chatRunning: boolean } = {
@@ -42,6 +43,7 @@ export function snapshot(): AppState {
       : null,
     settings: d.settings,
     busy: runtime.busy,
-    chatRunning: runtime.chatRunning
+    chatRunning: runtime.chatRunning,
+    googleAccount: googleAccountSnapshot()
   }
 }

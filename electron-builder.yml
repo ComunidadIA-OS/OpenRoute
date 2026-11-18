@@ -11,6 +11,9 @@ files:
 extraResources:
   - from: resources/samples
     to: samples
+  - from: resources
+    to: .
+    filter: [google-oauth.json]
 asarUnpack:
   - resources/**
 win:

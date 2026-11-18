@@ -131,6 +131,19 @@ export interface AppState {
   settings: Settings
   busy: BusyState | null
   chatRunning: boolean
+  googleAccount: GoogleAccountState
+}
+
+export interface GoogleProfile {
+  name: string
+  email: string
+}
+
+export interface GoogleAccountState {
+  configured: boolean
+  signingIn: boolean
+  profile: GoogleProfile | null
+  error: string | null
 }
 
 export interface BusyState {
@@ -194,6 +207,10 @@ export interface OpenRouteApi {
   saveProvider(id: ProviderId, input: { apiKey?: string | null; baseURL?: string }): Promise<void>
   listModels(id: ProviderId): Promise<ModelListResult>
   testModel(ref: ModelRef): Promise<{ ok: boolean; error?: string; ms?: number }>
+
+  signInWithGoogle(): Promise<void>
+  cancelGoogleSignIn(): Promise<void>
+  signOutGoogle(): Promise<void>
 
   openExternal(url: string): Promise<void>
   appInfo(): Promise<{ version: string; platform: string }>
