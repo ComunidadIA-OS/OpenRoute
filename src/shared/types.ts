@@ -186,7 +186,6 @@ export interface OpenRouteApi {
   deleteSession(id: string): Promise<void>
 
   importOrders(): Promise<ImportReport | null>
-  loadSample(): Promise<ImportReport>
   addOrder(order: Omit<Order, 'id'> & { id?: string }): Promise<void>
   updateOrder(id: string, patch: Partial<Order>): Promise<void>
   deleteOrder(id: string): Promise<void>

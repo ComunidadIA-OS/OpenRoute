@@ -2,11 +2,10 @@
 
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
+import { basename } from 'node:path'
 import { readSheet } from 'read-excel-file/node'
 import { parseOrdersCsv, parseOrdersTable, type ImportResult } from '../core/import'
 import { googleMapsLegs } from '../core/maps-links'
-import { SAMPLE_DEPOT, SAMPLE_VEHICLES } from '../core/sample'
 import type { Order, Vehicle } from '../core/types'
 import type { ChatEvent, ImportReport, ModelRef, ProviderId, Settings } from '../shared/types'
 import { sendMessage, stopChat, testModel } from './ai/agent'
@@ -21,23 +20,12 @@ import { emptySession, newId, store } from './store'
 
 const errorText = (e: unknown): string => (e instanceof Error ? e.message : String(e))
 
-function samplePath(): string {
-  const base = app.isPackaged ? process.resourcesPath : join(__dirname, '../../resources')
-  return join(base, 'samples', 'pedidos-alicante-elche.csv')
-}
-
-function applyImport(result: ImportResult, file: string, sample = false): ImportReport {
+function applyImport(result: ImportResult, file: string): ImportReport {
   const report = { added: result.orders.length, errors: result.errors, warnings: result.warnings, file }
   if (!result.orders.length) return report
 
   const s = store.active()
-  store.mutate((d) => {
-    if (sample) {
-      if (!d.depot || d.vehicles.length === 0) d.sessions.forEach(invalidatePlan)
-      if (!d.depot) d.depot = { ...SAMPLE_DEPOT }
-      if (d.vehicles.length === 0) d.vehicles = SAMPLE_VEHICLES.map((v) => ({ ...v }))
-      s.orders = []
-    }
+  store.mutate(() => {
     const existing = new Set(s.orders.map((o) => o.id))
     for (const o of result.orders) {
       const id = uniqueOrderId(o.id, existing)
@@ -118,9 +106,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return applyImport(result, basename(file))
   })
 
-  handle('orders:sample', () =>
-    applyImport(parseOrdersCsv(readFileSync(samplePath(), 'utf8')), 'pedidos-alicante-elche.csv', true)
-  )
   handle('orders:add', (o: Omit<Order, 'id'> & { id?: string }) => {
     const s = store.active()
     const base = o.id?.trim() || `P-${newId().slice(-5)}`

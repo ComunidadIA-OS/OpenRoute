@@ -2,6 +2,12 @@
 
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/). Versiones con [SemVer](https://semver.org/lang/es/).
 
+## [0.2.2] - 2026-11-18
+
+- La guía de cuatro pasos y la pantalla inicial te acompañan desde tu depósito y tu primer pedido hasta la revisión del plan. Los repartos empiezan con tus datos.
+- En Windows, Ajustes da acceso a tu suscripción desde las aplicaciones oficiales de ChatGPT, Claude y Antigravity. Puedes revisar el resumen del reparto antes de compartirlo.
+- El chat integrado permite escribir el nombre exacto del modelo de tu proveedor o servidor local.
+
 ## [0.2.1] - 2026-11-18
 
 - La aplicación se puede usar en español e inglés. En Windows, la primera instalación recoge el idioma del enlace de descarga y Ajustes permite cambiarlo después.

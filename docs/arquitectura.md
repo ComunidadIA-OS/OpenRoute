@@ -24,7 +24,7 @@ TypeScript puro: tipos, horas, distancias, motor de rutas, plan manual, importac
 
 - **`store.ts`**: el estado vive en `openroute.json` dentro de la carpeta de datos del usuario (`%APPDATA%/OpenRoute` en Windows). Se guarda con un pequeño retardo y escritura atómica. Las claves de API se cifran con `safeStorage` y nunca viajan a la interfaz: la interfaz solo sabe si hay clave o no.
 - **`planner.ts`**: geocodifica lo que falte, pide la matriz a OSRM (en bloques de 100 puntos), resuelve, calcula el plan manual de referencia y trae los trazados por calles. También mueve pedidos a mano.
-- **`ai/providers.ts`**: crea el modelo con el [AI SDK](https://ai-sdk.dev) según el proveedor elegido y pide la lista de modelos a cada proveedor.
+- **`ai/providers.ts`**: crea el modelo con el [AI SDK](https://ai-sdk.dev) según el proveedor elegido y el identificador exacto indicado en Ajustes.
 - **`ai/agent.ts`**: el agente planificador. Usa `streamText` con herramientas y un máximo de 10 pasos. Las herramientas leen y cambian el estado de la app; el texto y las llamadas se envían a la interfaz en tiempo real.
 - **`export.ts`**: hojas de ruta en PDF (una página por vehículo, con `printToPDF`) y el plan en CSV.
 - **`index.ts`**: la ventana y el protocolo `app://`. La interfaz no se carga con `file://`, para que los workers del mapa funcionen y la CSP tenga un origen propio.

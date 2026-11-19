@@ -20,7 +20,6 @@ const api: OpenRouteApi = {
   deleteSession: (id) => invoke('session:delete', id),
 
   importOrders: () => invoke('orders:import'),
-  loadSample: () => invoke('orders:sample'),
   addOrder: (o) => invoke('orders:add', o),
   updateOrder: (id, patch) => invoke('orders:update', id, patch),
   deleteOrder: (id) => invoke('orders:delete', id),

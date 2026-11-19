@@ -1,5 +1,24 @@
 // El texto español sirve de clave y mantiene los componentes legibles.
 export const messages = {
+  'Prepara tu primer plan de reparto': 'Set up your first delivery plan',
+  'OpenRoute calcula rutas con tu depósito, flota y pedidos. El chat es opcional y te ayuda a revisar o ajustar el plan.':
+    'OpenRoute calculates routes using your depot, fleet, and orders. Chat is optional and helps you review or adjust the plan.',
+  'Configurar flota y depósito': 'Set up fleet and depot',
+  'Añadir pedidos': 'Add orders',
+  'Añade tus pedidos': 'Add your orders',
+  'En Flota, guarda la dirección de salida y añade al menos un vehículo disponible con su capacidad y horario.':
+    'In Fleet, save your starting address and add at least one available vehicle with its capacity and working hours.',
+  'En Pedidos puedes añadir entregas una a una o importar un archivo CSV o Excel.':
+    'In Orders, add deliveries one by one or import a CSV or Excel file.',
+  'Abre Mapa y pulsa «Calcular rutas». Revisa las paradas y los horarios antes de aprobar el plan.':
+    'Open Map and select “Calculate routes.” Review the stops and times before approving the plan.',
+  'Con un modelo conectado, el chat puede explicar o ajustar tu plan. El motor de OpenRoute calcula las rutas con los datos de tu reparto.':
+    'With a model connected, chat can explain or adjust your plan. The OpenRoute engine calculates routes using your delivery data.',
+  'No hay pedidos. Añádelos en Pedidos.': 'There are no orders. Add them in Orders.',
+  'Usar coordenadas del depósito': 'Use depot coordinates',
+  'Completa la latitud y la longitud del depósito.': 'Enter both the latitude and longitude of the depot.',
+  Latitud: 'Latitude',
+  Longitud: 'Longitude',
   'Planifica el reparto de hoy': "Plan today's deliveries",
   '¿Qué pedidos urgentes hay y a qué hora llegan?': 'Which orders are urgent, and when will they arrive?',
   'La furgoneta diésel está en el taller. Replanifica sin ella': 'The diesel van is in the shop. Replan without it',
@@ -59,14 +78,10 @@ export const messages = {
   'Sube los pedidos de hoy y OpenRoute calcula las rutas de tu flota. Después cámbialas hablando con la IA que prefieras.':
     "Upload today's orders and OpenRoute calculates routes for your fleet. Then you can make changes using the AI model you choose.",
   'Importar CSV o Excel': 'Import CSV or Excel',
-  '{0} pedidos de ejemplo en Alicante y Elche': '{0} sample orders in Alicante and Elche',
-  'Probar con un ejemplo': 'Try a sample',
   'Una fila por pedido con dirección (o lat y lon), franja, peso y prioridad.':
     'Use one row per order with an address (or latitude and longitude), delivery window, weight, and priority.',
   'Ver formato': 'See file format',
   'Importa tus pedidos': 'Import your orders',
-  'En Pedidos puedes importar un CSV o Excel. Para explorar sin archivos, abre Mapa y elige «Probar con un ejemplo» en un reparto vacío.':
-    'In Orders, you can import a CSV or Excel file. To try the app without your own files, open Map and choose “Try a sample” in an empty delivery run.',
   'Configura tu flota': 'Set up your fleet',
   'En Flota ajusta los vehículos que usarás y la capacidad de cada uno.':
     'In Fleet, select the vehicles to use and set their capacities.',
@@ -286,7 +301,6 @@ export const messages = {
     'Orders changed while looking up addresses. Recalculate routes.',
   'Falta el depósito. Añádelo en Flota.': 'Set a depot in Fleet.',
   'No hay vehículos disponibles. Revisa la flota.': 'No vehicles are available. Check the fleet.',
-  'No hay pedidos. Importa un CSV o carga el ejemplo.': 'There are no orders. Import a CSV or load the sample.',
   'La flota cambió durante el cálculo. Vuelve a calcular las rutas.':
     'The fleet changed during calculation. Recalculate routes.',
   'No se ha podido ubicar ningún pedido en el mapa.': 'Could not locate any order on the map.',
