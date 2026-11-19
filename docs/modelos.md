@@ -1,14 +1,18 @@
-# Conectar un modelo de IA
+# Usar IA con tu reparto
 
-Abre **Ajustes → Modelos de IA**, elige un proveedor, pega tu clave y escribe el identificador exacto que admite tu cuenta y pulsa **Usar**. **Probar** manda un mensaje corto para comprobar que la clave y el modelo responden.
+Para calcular rutas y exportar la hoja de cada conductor, basta con configurar el depósito, añadir la flota e importar tus pedidos. Puedes empezar sin cuenta.
 
-No hace falta modelo para calcular rutas: el botón «Calcular rutas» usa solo el motor. El modelo sirve para pedir cambios hablando y para que te explique el plan.
+## Usar mi suscripción en Windows
 
-## Usar una suscripción desde el terminal en Windows
+1. Abre **Ajustes → Usar mi suscripción** y elige tu cuenta. OpenRoute abre la herramienta oficial de [ChatGPT (Codex)](https://developers.openai.com/codex/cli), [Claude Code](https://code.claude.com/docs/en/setup) o [Google Antigravity](https://antigravity.google/docs/getting-started?tab=cli).
+2. Si te aparece **Instalar**, sigue la guía del proveedor y vuelve a comprobar. Inicia sesión con el proveedor y, después, elige **Abrir asistente**. La conversación se abre en otra ventana y utiliza el acceso que incluya tu cuenta.
+3. Si quieres ayuda para interpretar un reparto, abre la vista previa del resumen. Marca la opción de incluirlo y abre el asistente. Recibirá los totales que has revisado. Los cambios en las rutas se hacen desde OpenRoute.
 
-En **Ajustes → Terminales de IA**, abre [Codex CLI](https://developers.openai.com/codex/cli), [Antigravity CLI](https://antigravity.google/docs/cli/tutorial/) o [Claude Code](https://code.claude.com/docs/en/setup). Instala el ejecutable nativo del proveedor y pulsa **Volver a comprobar** si la app estaba abierta. El inicio de sesión de cada CLI se hace desde su propio terminal y es independiente de la cuenta de OpenRoute.
+La cuenta de Google que identifica tu perfil local se gestiona aparte. Puedes seguir trabajando con tus pedidos al cerrar sesión.
 
-OpenRoute abre el CLI interactivo en una carpeta temporal vacía. Para pedir ayuda a Codex o Antigravity, puedes revisar y copiar los totales del reparto y pegarlos tú en el terminal. El resumen contiene cantidades, distancias y tiempos del motor. Los datos de clientes y las direcciones permanecen en OpenRoute. El chat integrado de **Modelos de IA** usa la conexión configurada en esa pestaña.
+## Conectar el chat que puede cambiar pedidos
+
+En Ajustes, abre la configuración del chat integrado, elige el proveedor, guarda su clave si la requiere y escribe el identificador exacto del modelo. Pulsa **Usar** para activarlo. Con un servidor local como Ollama basta con la dirección del servidor y el identificador.
 
 ## Dónde encontrar el nombre del modelo
 
