@@ -42,7 +42,6 @@ const api: OpenRouteApi = {
 
   saveSettings: (patch) => invoke('settings:save', patch),
   saveProvider: (id, input) => invoke('provider:save', id, input),
-  listModels: (id) => invoke('provider:models', id),
   testModel: (ref) => invoke('model:test', ref),
 
   signInWithGoogle: () => invoke('google:sign-in'),
@@ -50,7 +49,7 @@ const api: OpenRouteApi = {
   signOutGoogle: () => invoke('google:sign-out'),
 
   listLocalClis: () => invoke('cli:list'),
-  launchLocalCli: (id) => invoke('cli:launch', id),
+  launchLocalCli: (id, action, summary) => invoke('cli:launch', id, action, summary),
 
   openExternal: (url) => invoke('app:open', url),
   appInfo: () => invoke('app:info')

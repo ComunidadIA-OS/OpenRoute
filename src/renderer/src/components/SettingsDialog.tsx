@@ -1,4 +1,4 @@
-import { Check, ExternalLink, KeyRound, LoaderCircle, X } from 'lucide-react'
+import { Check, ExternalLink, KeyRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { PROVIDERS, type ProviderId } from '@shared/types'
 import { cn } from '../lib/format'
@@ -21,29 +21,16 @@ function ProviderEditor({ id }: { id: ProviderId }) {
   const cfg = app.settings.providers[id]
   const [key, setKey] = useState('')
   const [baseURL, setBaseURL] = useState(cfg?.baseURL ?? info.defaultBaseURL ?? '')
-  const [models, setModels] = useState<string[]>([])
-  const [listError, setListError] = useState<string | null>(null)
-  const autoLoad = info.needsKey ? Boolean(cfg?.hasKey) : true
-  const [loading, setLoading] = useState(autoLoad)
   const [model, setModel] = useState(app.settings.activeModel?.provider === id ? app.settings.activeModel.model : '')
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null)
-  const ready = info.needsKey ? cfg?.hasKey : Boolean(baseURL)
+  const ready = (!info.needsKey || cfg?.hasKey) && (!info.needsBaseURL || Boolean(baseURL.trim()))
 
-  const apply = (r: { models: string[]; error?: string }): void => {
-    setLoading(false)
-    setModels(r.models)
-    setListError(r.error ?? null)
-    setModel((m) => m || r.models[0] || '')
+  const exactModel = model.trim()
+  const saveEndpoint = async (): Promise<void> => {
+    if (info.needsBaseURL && baseURL.trim() !== (cfg?.baseURL ?? info.defaultBaseURL)) {
+      await api.saveProvider(id, { baseURL: baseURL.trim() })
+    }
   }
-  const load = async (): Promise<void> => {
-    setLoading(true)
-    apply(await api.listModels(id))
-  }
-
-  useEffect(() => {
-    if (autoLoad) api.listModels(id).then(apply)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   return (
     <div className="space-y-4">
@@ -71,9 +58,10 @@ function ProviderEditor({ id }: { id: ProviderId }) {
           <div className="mt-1 flex gap-2">
             <input className={field} value={baseURL} onChange={(e) => setBaseURL(e.target.value)} />
             <button
+              disabled={!baseURL.trim()}
               onClick={async () => {
-                await api.saveProvider(id, { baseURL })
-                load()
+                await saveEndpoint()
+                toast(t('Ajustes guardados'), 'ok')
               }}
               className="shrink-0 rounded-lg border border-line-2 px-3 text-[12.5px] text-tx-2 hover:text-tx"
             >
@@ -111,7 +99,6 @@ function ProviderEditor({ id }: { id: ProviderId }) {
                 await api.saveProvider(id, { apiKey: key })
                 setKey('')
                 toast(t('Clave guardada'), 'ok')
-                load()
               }}
               className="shrink-0 rounded-lg bg-ac px-3 text-[12.5px] font-semibold text-ac-ink disabled:bg-bg-3 disabled:text-tx-3"
             >
@@ -134,30 +121,26 @@ function ProviderEditor({ id }: { id: ProviderId }) {
       )}
 
       <div className="block text-[12px] text-tx-3">
-        {t('Modelo')}
+        <label htmlFor="exact-model">{t('Nombre exacto del modelo')}</label>
         <div className="mt-1 flex gap-2">
-          {models.length > 0 ? (
-            <select className={field} value={model} onChange={(e) => setModel(e.target.value)}>
-              {!models.includes(model) && model && <option value={model}>{model}</option>}
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className={field}
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder={t('Nombre exacto del modelo')}
-            />
-          )}
+          <input
+            id="exact-model"
+            className={field}
+            value={model}
+            spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            onChange={(event) => {
+              setModel(event.target.value)
+              setTest(null)
+            }}
+          />
           <button
-            disabled={!model || !ready}
+            disabled={!exactModel || !ready}
             onClick={async () => {
               setTest({ ok: true, text: t('Probando…') })
-              const r = await api.testModel({ provider: id, model })
+              await saveEndpoint()
+              const r = await api.testModel({ provider: id, model: exactModel })
               setTest(
                 r.ok
                   ? {
@@ -175,31 +158,22 @@ function ProviderEditor({ id }: { id: ProviderId }) {
             {t('Probar')}
           </button>
           <button
-            disabled={!model || !ready}
+            disabled={!exactModel || !ready}
             onClick={async () => {
-              await api.saveSettings({ activeModel: { provider: id, model } })
-              toast(t('Ahora hablas con {0}', model), 'ok')
+              await saveEndpoint()
+              await api.saveSettings({ activeModel: { provider: id, model: exactModel } })
+              toast(t('Ahora hablas con {0}', exactModel), 'ok')
             }}
             className="shrink-0 rounded-lg bg-tx px-3 text-[12.5px] font-semibold text-bg disabled:opacity-40"
           >
             {t('Usar')}
           </button>
         </div>
-        {loading && (
-          <span className="mt-1 flex items-center gap-1 text-[11.5px]">
-            <LoaderCircle size={11} className="animate-spin" /> {t('Cargando modelos…')}
-          </span>
-        )}
-        {listError && (
-          <span className="mt-1 block text-[11.5px] text-amber">
-            {t('No se ha podido pedir la lista:')} {detail(listError)}
-          </span>
-        )}
         {test && <span className={cn('mt-1 block text-[11.5px]', test.ok ? 'text-ac' : 'text-err')}>{test.text}</span>}
       </div>
       <p className="text-[11.5px] leading-relaxed text-tx-3">
         {t(
-          'El planificador necesita un modelo que sepa usar herramientas. Los modelos grandes de Claude, ChatGPT y Gemini van sobrados; en local, prueba qwen3 o llama3.1 de 8B o más.'
+          'Copia el identificador de tu proveedor. Para cambiar pedidos desde el chat, el modelo debe admitir herramientas.'
         )}
       </p>
     </div>
@@ -322,10 +296,10 @@ export function SettingsDialog() {
           <div className="px-2 pb-3 pt-1 text-[15px] font-semibold tracking-[-0.02em]">{t('Ajustes')}</div>
           {(
             [
-              ['models', t('Modelos de IA')],
-              ['cli', t('Terminales de IA')],
+              ['cli', t('Usar mi suscripción')],
+              ['models', t('Chat integrado')],
               ['routing', t('Mapa y rutas')],
-              ['account', t('Cuenta')],
+              ['account', t('Cuenta de OpenRoute')],
               ['about', t('Acerca de')]
             ] as const
           ).map(([k, label]) => (

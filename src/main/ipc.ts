@@ -9,7 +9,6 @@ import { googleMapsLegs } from '../core/maps-links'
 import type { Order, Vehicle } from '../core/types'
 import type { ChatEvent, ImportReport, ModelRef, ProviderId, Settings } from '../shared/types'
 import { sendMessage, stopChat, testModel } from './ai/agent'
-import { listModels } from './ai/providers'
 import { planCsv, planPdf } from './export'
 import { isAppLanguage } from './language'
 import { cancelGoogleSignIn, clearGoogleAccount, startGoogleSignIn } from './google-account'
@@ -266,7 +265,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     if (input.apiKey !== undefined) store.setSecret(id, input.apiKey ? input.apiKey.trim() : null)
   })
-  handle('provider:models', (id: ProviderId) => listModels(id))
   handle('model:test', (ref: ModelRef) => testModel(ref))
 
   handle('google:sign-in', startGoogleSignIn)

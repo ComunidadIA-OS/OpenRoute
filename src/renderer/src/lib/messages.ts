@@ -320,7 +320,39 @@ export const messages = {
   '{0} vehículos disponibles': '{0} available vehicles',
   '{0} vehículo disponible': '{0} available vehicle',
   '{0} sin asignar': '{0} unassigned',
-  'Cierra esta ventana para volver a OpenRoute.': 'Close this window to return to OpenRoute.'
+  'Cierra esta ventana para volver a OpenRoute.': 'Close this window to return to OpenRoute.',
+  'Copia el identificador de tu proveedor. Para cambiar pedidos desde el chat, el modelo debe admitir herramientas.':
+    'Copy the model ID from your provider. To change orders in chat, choose a model that supports tools.',
+  'Usar mi suscripción': 'Use my subscription',
+  'Chat integrado': 'Built-in chat',
+  'Cuenta de OpenRoute': 'OpenRoute account',
+  'Configurar chat integrado': 'Set up built-in chat',
+  'Configurar IA': 'Set up AI',
+  'Usa ChatGPT, Claude o Google en el asistente oficial de Windows, que se abre en una ventana aparte. El proveedor aplica los límites de tu plan.':
+    'Use ChatGPT, Claude, or Google in an official assistant that opens in a separate window on Windows. The provider applies your plan limits.',
+  'Si es tu primera vez, inicia sesión con ChatGPT en tu navegador.':
+    'On first use, sign in with ChatGPT in your browser.',
+  'Si es tu primera vez, inicia sesión con Claude en tu navegador.':
+    'On first use, sign in with Claude in your browser.',
+  'Si Antigravity te pide iniciar sesión, elige tu cuenta de Google.':
+    'If Antigravity asks you to sign in, choose your Google account.',
+  'Vista previa del resumen del reparto': 'Preview the delivery summary',
+  'El resumen incluye los totales del reparto. Si lo marcas, el asistente podrá leerlo al abrirse y enviarlo al proveedor.':
+    'The summary contains delivery totals. If selected, the assistant can read it and send it to the provider when it opens.',
+  'Incluir este resumen al abrir el asistente': 'Include this summary when opening the assistant',
+  'Instala el asistente para continuar': 'Install the assistant to continue',
+  'Iniciar sesión': 'Sign in',
+  'Iniciar sesión en {0}': 'Sign in to {0}',
+  'Sesión iniciada': 'Signed in',
+  'Abrir asistente': 'Open assistant',
+  'Abrir con resumen': 'Open with summary',
+  'Cada asistente se abre en una carpeta propia y usa la sesión que tú iniciaste con su proveedor.':
+    'Each assistant opens in its own folder and uses the session you started with its provider.',
+  'El chat integrado requiere una conexión de IA propia.': 'The built-in chat requires its own AI connection.',
+  'Puedes gestionar el acceso de Google a OpenRoute en Cuenta de OpenRoute.':
+    'Manage Google sign-in for OpenRoute under OpenRoute account.',
+  'El resumen cambió. Revísalo y vuelve a abrir el asistente.':
+    'The summary changed. Review it and open the assistant again.'
 } as const
 
 export type Message = keyof typeof messages

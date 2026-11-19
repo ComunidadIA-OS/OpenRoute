@@ -1,7 +1,7 @@
 // Contrato entre el proceso principal y la interfaz.
 
 import type { AppLanguage, Depot, Order, Plan, Vehicle } from '../core/types'
-import type { LocalCliId, LocalCliLaunch, LocalCliList } from './local-cli'
+import type { LocalCliAction, LocalCliId, LocalCliLaunch, LocalCliList } from './local-cli'
 
 export type ProviderId = 'anthropic' | 'openai' | 'google' | 'openrouter' | 'ollama' | 'custom'
 
@@ -15,8 +15,6 @@ export interface ProviderInfo {
   defaultBaseURL?: string
   keyHint?: string
   keyUrl?: string
-  /** Modelos sugeridos si no se puede pedir la lista al proveedor. */
-  suggested: string[]
 }
 
 export const PROVIDERS: ProviderInfo[] = [
@@ -26,8 +24,7 @@ export const PROVIDERS: ProviderInfo[] = [
     needsKey: true,
     needsBaseURL: false,
     keyHint: 'sk-ant-…',
-    keyUrl: 'https://console.anthropic.com/settings/keys',
-    suggested: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']
+    keyUrl: 'https://console.anthropic.com/settings/keys'
   },
   {
     id: 'openai',
@@ -35,8 +32,7 @@ export const PROVIDERS: ProviderInfo[] = [
     needsKey: true,
     needsBaseURL: false,
     keyHint: 'sk-…',
-    keyUrl: 'https://platform.openai.com/api-keys',
-    suggested: []
+    keyUrl: 'https://platform.openai.com/api-keys'
   },
   {
     id: 'google',
@@ -44,8 +40,7 @@ export const PROVIDERS: ProviderInfo[] = [
     needsKey: true,
     needsBaseURL: false,
     keyHint: 'AIza…',
-    keyUrl: 'https://aistudio.google.com/apikey',
-    suggested: []
+    keyUrl: 'https://aistudio.google.com/apikey'
   },
   {
     id: 'openrouter',
@@ -53,24 +48,21 @@ export const PROVIDERS: ProviderInfo[] = [
     needsKey: true,
     needsBaseURL: false,
     keyHint: 'sk-or-…',
-    keyUrl: 'https://openrouter.ai/keys',
-    suggested: []
+    keyUrl: 'https://openrouter.ai/keys'
   },
   {
     id: 'ollama',
     name: 'Ollama',
     needsKey: false,
     needsBaseURL: true,
-    defaultBaseURL: 'http://localhost:11434',
-    suggested: []
+    defaultBaseURL: 'http://localhost:11434'
   },
   {
     id: 'custom',
     name: 'Compatible con OpenAI',
     needsKey: false,
     needsBaseURL: true,
-    defaultBaseURL: 'http://localhost:1234/v1',
-    suggested: []
+    defaultBaseURL: 'http://localhost:1234/v1'
   }
 ]
 
@@ -170,11 +162,6 @@ export interface ImportReport {
   file?: string
 }
 
-export interface ModelListResult {
-  models: string[]
-  error?: string
-}
-
 export interface OpenRouteApi {
   getState(): Promise<AppState>
   onState(cb: (state: AppState) => void): () => void
@@ -208,7 +195,6 @@ export interface OpenRouteApi {
 
   saveSettings(patch: Partial<Omit<Settings, 'providers'>>): Promise<void>
   saveProvider(id: ProviderId, input: { apiKey?: string | null; baseURL?: string }): Promise<void>
-  listModels(id: ProviderId): Promise<ModelListResult>
   testModel(ref: ModelRef): Promise<{ ok: boolean; error?: string; ms?: number }>
 
   signInWithGoogle(): Promise<void>
@@ -216,7 +202,7 @@ export interface OpenRouteApi {
   signOutGoogle(): Promise<void>
 
   listLocalClis(): Promise<LocalCliList>
-  launchLocalCli(id: LocalCliId): Promise<LocalCliLaunch>
+  launchLocalCli(id: LocalCliId, action?: LocalCliAction, summary?: string): Promise<LocalCliLaunch>
 
   openExternal(url: string): Promise<void>
   appInfo(): Promise<{ version: string; platform: string }>
