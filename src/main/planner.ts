@@ -114,9 +114,7 @@ export async function planSession(session: Session): Promise<Plan> {
       ui('No hay vehículos disponibles. Revisa la flota.', 'No vehicles are available. Check your fleet.')
     )
   if (session.orders.length === 0)
-    throw new Error(
-      ui('No hay pedidos. Añádelos en Pedidos.', 'There are no orders. Add them in Orders.')
-    )
+    throw new Error(ui('No hay pedidos. Añádelos en Pedidos.', 'There are no orders. Add them in Orders.'))
 
   try {
     const previousPlan = session.plan
