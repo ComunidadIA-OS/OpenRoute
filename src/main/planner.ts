@@ -115,7 +115,7 @@ export async function planSession(session: Session): Promise<Plan> {
     )
   if (session.orders.length === 0)
     throw new Error(
-      ui('No hay pedidos. Importa un CSV o carga el ejemplo.', 'There are no orders. Import a CSV or load the example.')
+      ui('No hay pedidos. Añádelos en Pedidos.', 'There are no orders. Add them in Orders.')
     )
 
   try {

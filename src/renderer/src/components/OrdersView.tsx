@@ -43,7 +43,7 @@ function AddOrder({ onClose }: { onClose: () => void }) {
         toast(t('Pedido añadido. Se ubicará en el mapa al calcular.'), 'ok')
         onClose()
       }}
-      className="fade-up grid grid-cols-[1.2fr_2fr_0.6fr_0.6fr_0.6fr_0.7fr_auto] items-end gap-2 border-b border-line bg-bg-1 px-5 py-3"
+      className="fade-up grid grid-cols-2 items-end gap-2 border-b border-line bg-bg-1 px-5 py-3"
     >
       <label className="text-[11.5px] text-tx-3">
         {t('Cliente')}
@@ -94,7 +94,7 @@ function AddOrder({ onClose }: { onClose: () => void }) {
           <option value="1">{t('Baja')}</option>
         </select>
       </label>
-      <div className="flex gap-1.5">
+      <div className="col-span-2 flex justify-end gap-1.5">
         <button
           type="button"
           onClick={onClose}

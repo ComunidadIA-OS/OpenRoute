@@ -72,25 +72,12 @@ export const messages = {
   'Iniciar sesión con Google': 'Sign in with Google',
   'El inicio de sesión con Google no está configurado para esta instalación.':
     'Google sign-in is unavailable for this installation.',
-  'No se ha importado ningún pedido': 'No orders were imported',
-  'Tu reparto,': 'Your deliveries,',
-  'en piloto automático.': 'on autopilot.',
-  'Sube los pedidos de hoy y OpenRoute calcula las rutas de tu flota. Después cámbialas hablando con la IA que prefieras.':
-    "Upload today's orders and OpenRoute calculates routes for your fleet. Then you can make changes using the AI model you choose.",
-  'Importar CSV o Excel': 'Import CSV or Excel',
   'Una fila por pedido con dirección (o lat y lon), franja, peso y prioridad.':
     'Use one row per order with an address (or latitude and longitude), delivery window, weight, and priority.',
   'Ver formato': 'See file format',
-  'Importa tus pedidos': 'Import your orders',
   'Configura tu flota': 'Set up your fleet',
-  'En Flota ajusta los vehículos que usarás y la capacidad de cada uno.':
-    'In Fleet, select the vehicles to use and set their capacities.',
   'Calcula las rutas': 'Calculate routes',
-  'Con los pedidos cargados, abre Mapa y pulsa «Calcular rutas». Revisa las paradas antes de aprobar el plan.':
-    'With orders loaded, open Map and select “Calculate routes.” Review the stops before approving the plan.',
   'Pide cambios en el chat': 'Ask for changes in chat',
-  'Si conectas un modelo, puedes pedirle cambios o explicaciones. También puedes calcular las rutas desde el mapa.':
-    'If you connect a model, you can ask it for changes or explanations. You can also calculate routes directly from the map.',
   Paso: 'Step',
   de: 'of',
   Omitir: 'Skip',

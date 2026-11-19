@@ -1,22 +1,13 @@
-import { FileSpreadsheet, Sparkles } from 'lucide-react'
-import { api, useUi } from '../store'
+import { Table2, Truck } from 'lucide-react'
 import { Isotipo } from './Logo'
 
 import { useI18n } from '../lib/i18n'
+import { api, useUi } from '../store'
 
 export function EmptyState() {
-  const { t, detail } = useI18n()
-  const toast = useUi((s) => s.toast)
-  const importFile = async (): Promise<void> => {
-    const r = await api.importOrders()
-    if (!r) return
-    if (r.added === 0) toast(r.errors[0] ? detail(r.errors[0].message) : t('No se ha importado ningún pedido'), 'error')
-    else
-      toast(
-        t('{0} pedidos importados{1}', r.added, r.errors.length ? t(' · {0} filas con error', r.errors.length) : ''),
-        r.errors.length ? 'error' : 'ok'
-      )
-  }
+  const { t } = useI18n()
+  const setView = useUi((s) => s.setView)
+  const needsFleet = useUi((s) => !s.app?.depot || !s.app.vehicles.some((vehicle) => vehicle.available))
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center bg-bg/80 backdrop-blur-[2px]">
       <div className="grid-texture absolute inset-0" />
@@ -25,32 +16,26 @@ export function EmptyState() {
           <Isotipo size={34} live />
         </div>
         <h1 className="mt-6 text-[34px] font-semibold leading-[1.05] tracking-[-0.045em]">
-          {t('Tu reparto,')}
-          <br />
-          {t('en piloto automático.')}
+          {t('Prepara tu primer plan de reparto')}
         </h1>
         <p className="mt-3 max-w-[380px] text-[14px] leading-relaxed text-tx-2">
           {t(
-            'Sube los pedidos de hoy y OpenRoute calcula las rutas de tu flota. Después cámbialas hablando con la IA que prefieras.'
+            'OpenRoute calcula rutas con tu depósito, flota y pedidos. El chat es opcional y te ayuda a revisar o ajustar el plan.'
           )}
         </p>
         <div className="mt-7 flex gap-2.5">
           <button
-            onClick={importFile}
+            onClick={() => setView(needsFleet ? 'fleet' : 'orders')}
             className="glow flex items-center gap-2 rounded-full bg-ac px-5 py-2.5 text-[13.5px] font-semibold text-ac-ink hover:brightness-105"
           >
-            <FileSpreadsheet size={15} />
-            {t('Importar CSV o Excel')}
+            {needsFleet ? <Truck size={15} /> : <Table2 size={15} />}
+            {t(needsFleet ? 'Configurar flota y depósito' : 'Añadir pedidos')}
           </button>
           <button
-            onClick={async () => {
-              const r = await api.loadSample()
-              toast(t('{0} pedidos de ejemplo en Alicante y Elche', r.added), 'ok')
-            }}
+            onClick={() => setView(needsFleet ? 'orders' : 'fleet')}
             className="flex items-center gap-2 rounded-full border border-line-2 bg-bg-2 px-5 py-2.5 text-[13.5px] text-tx hover:border-ac/40"
           >
-            <Sparkles size={15} className="text-ac" />
-            {t('Probar con un ejemplo')}
+            {t(needsFleet ? 'Añadir pedidos' : 'Flota y depósito')}
           </button>
         </div>
         <p className="mt-5 text-[12px] text-tx-3">

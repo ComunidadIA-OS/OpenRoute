@@ -5,27 +5,26 @@ import { useI18n } from '../lib/i18n'
 const STORAGE_KEY = 'openroute:first-run-tour:v1'
 const STEPS = [
   {
-    selector: '[data-tour="orders"]',
-    title: 'Importa tus pedidos',
-    description:
-      'En Pedidos puedes importar un CSV o Excel. Para explorar sin archivos, abre Mapa y elige «Probar con un ejemplo» en un reparto vacío.'
-  },
-  {
     selector: '[data-tour="fleet"]',
     title: 'Configura tu flota',
-    description: 'En Flota ajusta los vehículos que usarás y la capacidad de cada uno.'
+    description:
+      'En Flota, guarda la dirección de salida y añade al menos un vehículo disponible con su capacidad y horario.'
+  },
+  {
+    selector: '[data-tour="orders"]',
+    title: 'Añade tus pedidos',
+    description: 'En Pedidos puedes añadir entregas una a una o importar un archivo CSV o Excel.'
   },
   {
     selector: '[data-tour="map"]',
     title: 'Calcula las rutas',
-    description:
-      'Con los pedidos cargados, abre Mapa y pulsa «Calcular rutas». Revisa las paradas antes de aprobar el plan.'
+    description: 'Abre Mapa y pulsa «Calcular rutas». Revisa las paradas y los horarios antes de aprobar el plan.'
   },
   {
     selector: '[data-tour="chat"] textarea',
     title: 'Pide cambios en el chat',
     description:
-      'Si conectas un modelo, puedes pedirle cambios o explicaciones. También puedes calcular las rutas desde el mapa.'
+      'Con un modelo conectado, el chat puede explicar o ajustar tu plan. El motor de OpenRoute calcula las rutas con los datos de tu reparto.'
   }
 ] as const
 
@@ -94,7 +93,10 @@ export function FirstRunTour({ onClose }: { onClose: () => void }) {
       ref={dialog}
       aria-labelledby="tour-heading"
       aria-describedby="tour-progress tour-description"
-      onCancel={(event) => event.preventDefault()}
+      onCancel={(event) => {
+        event.preventDefault()
+        dismiss()
+      }}
       className="fixed inset-0 m-0 h-dvh max-h-none w-dvw max-w-none overflow-hidden border-0 bg-transparent text-tx backdrop:bg-black/35"
     >
       {target && (

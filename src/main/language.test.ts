@@ -56,4 +56,13 @@ describe('idioma inicial', () => {
     expect(store.state.settings).toMatchObject({ language: 'es', countryCodes: 'co', serviceMin: 11 })
     expect(JSON.parse(readFileSync(path, 'utf8')).settings.language).toBe('es')
   })
+
+  it('inicia un reparto vacío y permite buscar direcciones en cualquier país', async () => {
+    const { store } = await import('./store')
+    store.load()
+    expect(store.state.settings.countryCodes).toBe('')
+    expect(store.state.depot).toBeNull()
+    expect(store.state.vehicles).toEqual([])
+    expect(store.active()).toMatchObject({ orders: [], plan: null })
+  })
 })

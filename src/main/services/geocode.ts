@@ -35,7 +35,7 @@ function saveCache(): void {
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
-export async function geocode(address: string, countryCodes = 'es', near?: LatLng): Promise<LatLng | null> {
+export async function geocode(address: string, countryCodes: string, near?: LatLng): Promise<LatLng | null> {
   const key = `${countryCodes}|${address.trim().toLowerCase()}`
   const c = loadCache()
   if (key in c) return c[key]

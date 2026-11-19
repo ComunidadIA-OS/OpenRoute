@@ -30,20 +30,15 @@
 - **Mide el ahorro** frente a un plan manual por zonas, el que haría un jefe de tráfico con un Excel.
 - **Manda cada ruta al conductor** con un enlace de Google Maps o en hojas de ruta en PDF.
 
-## La IA entiende, el motor calcula
+## ¿Cuándo usar OpenRoute en lugar de abrir ChatGPT o Claude?
 
-Los modelos de lenguaje se inventan cosas. Por eso en OpenRoute la IA nunca calcula una ruta: entiende lo que pides y usa herramientas. Las rutas, horas, kilómetros y costes salen siempre de un motor de optimización determinista escrito en TypeScript (inserción con arrepentimiento, búsqueda local y destrucción y reconstrucción). Funciona incluso sin modelo: el botón «Calcular rutas» no necesita IA.
-
-```
-Tú ──► modelo que elijas ──► herramientas ──► motor de rutas ──► mapa y plan
-          (entiende)          (actúan)          (calcula)
-```
+Un chat te ayuda a decidir cómo comunicar un retraso o qué alternativa estudiar. Cuando se avería una furgoneta, en OpenRoute puedes marcarla como indisponible y recalcular con los vehículos restantes. Verás el nuevo orden de las paradas, las horas previstas y los pedidos que quedan sin asignar. El plan se guarda en tu equipo y puedes entregar a cada conductor su hoja de ruta. El botón «Calcular rutas» funciona incluso sin conectar una IA.
 
 Más detalle en [docs/motor.md](docs/motor.md) y [docs/arquitectura.md](docs/arquitectura.md).
 
 ## Trae tu propio modelo
 
-Pegas tu clave en Ajustes y listo. Pagas directamente al proveedor; OpenRoute no revende nada ni pasa por intermediarios.
+Para consultar tu suscripción en Windows, abre Ajustes y elige tu proveedor. El acceso se completa en su aplicación oficial. El chat integrado puede actuar sobre el reparto si conectas un modelo por API o un servidor local. En ese caso escribe el identificador exacto del modelo y pulsa **Usar**.
 
 | Proveedor | Qué necesitas |
 |---|---|
@@ -62,13 +57,13 @@ Las claves se cifran con el almacén seguro del sistema (DPAPI en Windows, Keych
 
 ## Empezar en un minuto
 
-1. [Descarga el instalador de Windows](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe). En las versiones firmadas puedes comprobar quién lo publicó en **Propiedades → Firmas digitales** y comparar su SHA-256 con el que aparece en la página de la versión. El instalador 0.2.1 se distribuye sin firma de editor. Si Windows bloquea el archivo, espera una versión firmada o [compila la app desde el código](#desarrollo).
+1. [Descarga el instalador de Windows](https://github.com/ComunidadIA-OS/OpenRoute/releases/latest/download/OpenRoute-Setup.exe). En las versiones firmadas puedes comprobar quién lo publicó en **Propiedades → Firmas digitales** y comparar su SHA-256 con el que aparece en la página de la versión. El instalador 0.2.2 se distribuye sin firma de editor. Si Windows bloquea el archivo, espera una versión firmada o [compila la app desde el código](#desarrollo).
    La descarga desde [la web en inglés](https://openroute.es/en/) inicia OpenRoute en inglés en un perfil nuevo. Puedes cambiar el idioma en Ajustes y conservar tus repartos.
-2. Pulsa **Probar con un ejemplo**: carga 30 pedidos de ejemplo en Alicante y Elche y una flota de tres furgonetas.
-3. Pulsa **Calcular rutas**.
-4. Si quieres hablar con el planificador, abre **Ajustes**, elige un proveedor y pega tu clave.
+2. En **Flota**, guarda la dirección del depósito y añade un vehículo disponible con su capacidad y jornada.
+3. En **Pedidos**, añade tus entregas a mano o importa un CSV o Excel.
+4. En **Mapa**, pulsa **Calcular rutas** y revisa el plan. Si quieres ajustarlo desde el chat, conecta un modelo en **Ajustes**.
 
-Para tus pedidos, mira el [formato de importación](docs/importar-pedidos.md).
+Puedes volver a abrir la guía con el botón **?** de la barra superior. Consulta el [formato de importación](docs/importar-pedidos.md) para preparar tu archivo.
 
 ## Privacidad
 

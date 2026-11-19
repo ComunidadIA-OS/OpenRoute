@@ -14,14 +14,25 @@ function DepotCard() {
   const toast = useUi((s) => s.toast)
   const [name, setName] = useState(app.depot?.name)
   const [address, setAddress] = useState(app.depot?.address ?? '')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
   const [saving, setSaving] = useState(false)
+  const hasCoordinates = Boolean(latitude && longitude)
   return (
     <form
       onSubmit={async (e) => {
         e.preventDefault()
+        if (Boolean(latitude) !== Boolean(longitude)) {
+          toast(t('Completa la latitud y la longitud del depósito.'), 'error')
+          return
+        }
         setSaving(true)
         try {
-          await api.setDepot({ name: name?.trim() || t('Depósito'), address })
+          await api.setDepot({
+            name: name?.trim() || t('Depósito'),
+            address: address.trim(),
+            ...(hasCoordinates ? { lat: Number(latitude), lng: Number(longitude) } : {})
+          })
           toast(t('Depósito guardado'), 'ok')
         } catch (err) {
           toast(err instanceof Error ? detail(err.message) : t('Error'), 'error')
@@ -53,7 +64,7 @@ function DepotCard() {
           onChange={(e) => setAddress(e.target.value)}
           placeholder={t('Dirección del almacén')}
           aria-label={t('Dirección del almacén')}
-          required
+          required={!hasCoordinates}
         />
         <button
           disabled={saving}
@@ -62,6 +73,35 @@ function DepotCard() {
           {saving ? t('Buscando…') : t('Guardar')}
         </button>
       </div>
+      <details className="mt-2 text-[11.5px] text-tx-3">
+        <summary className="cursor-pointer">{t('Usar coordenadas del depósito')}</summary>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label>
+            {t('Latitud')}
+            <input
+              type="number"
+              step="any"
+              min={-90}
+              max={90}
+              className={field}
+              value={latitude}
+              onChange={(e) => setLatitude(e.target.value)}
+            />
+          </label>
+          <label>
+            {t('Longitud')}
+            <input
+              type="number"
+              step="any"
+              min={-180}
+              max={180}
+              className={field}
+              value={longitude}
+              onChange={(e) => setLongitude(e.target.value)}
+            />
+          </label>
+        </div>
+      </details>
       <p className="mt-2 text-[11.5px] text-tx-3">{t('Todas las rutas salen y vuelven aquí.')}</p>
     </form>
   )
@@ -198,7 +238,7 @@ export function FleetView() {
           <h2 className="text-[22px] font-semibold tracking-[-0.03em]">{t('Flota y depósito')}</h2>
           <p className="mt-1 text-[13px] text-tx-2">{t('Lo que cambies aquí se aplica al recalcular el plan.')}</p>
         </div>
-        <DepotCard key={`${app.depot?.lat}|${app.depot?.name}`} />
+        <DepotCard key={JSON.stringify(app.depot)} />
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
           {app.vehicles.map((v, i) => (
             <VehicleCard key={JSON.stringify(v)} v={v} index={i} />

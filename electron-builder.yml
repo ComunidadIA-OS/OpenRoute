@@ -9,8 +9,6 @@ files:
   - package.json
   - '!**/*.map'
 extraResources:
-  - from: resources/samples
-    to: samples
   - from: resources
     to: .
     filter: [google-oauth.json]

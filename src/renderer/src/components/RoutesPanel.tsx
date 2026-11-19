@@ -207,6 +207,7 @@ export function RoutesPanel() {
   const { eur, km } = metricFormats[language]
   const app = useUi((s) => s.app)!
   const toast = useUi((s) => s.toast)
+  const setView = useUi((s) => s.setView)
   const [exportOpen, setExportOpen] = useState(false)
   const session = app.active!
   const plan = session.plan
@@ -219,6 +220,7 @@ export function RoutesPanel() {
 
   if (!plan) {
     const available = app.vehicles.filter((vehicle) => vehicle.available).length
+    const needsFleet = !app.depot || available === 0
     return (
       <div className="panel fade-up absolute right-4 top-4 z-10 w-[330px] rounded-2xl p-4">
         <div className="text-[13px] text-tx-2">{t('Pedidos de este reparto')}</div>
@@ -228,12 +230,12 @@ export function RoutesPanel() {
           {app.depot ? t(' · salen de {0}', app.depot.name) : ''}
         </div>
         <button
-          onClick={run}
+          onClick={needsFleet ? () => setView('fleet') : run}
           disabled={Boolean(busy)}
           className="glow mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-ac py-2.5 text-[13.5px] font-semibold text-ac-ink transition hover:brightness-105 disabled:opacity-60"
         >
           <RouteIcon size={15} />
-          {t('Calcular rutas')}
+          {t(needsFleet ? 'Configurar flota y depósito' : 'Calcular rutas')}
         </button>
         <p className="mt-2.5 text-[11.5px] leading-relaxed text-tx-3">
           {t('Funciona sin modelo de IA. El motor respeta franjas, capacidades y prioridades.')}

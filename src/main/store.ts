@@ -42,7 +42,7 @@ function defaultSettings(language: AppLanguage): Settings {
   const providers = Object.fromEntries(
     PROVIDERS.map((p) => [p.id, { hasKey: false, ...(p.defaultBaseURL ? { baseURL: p.defaultBaseURL } : {}) }])
   ) as Settings['providers']
-  return { language, providers, activeModel: null, osrmUrl: DEFAULT_OSRM, countryCodes: 'es', serviceMin: 8 }
+  return { language, providers, activeModel: null, osrmUrl: DEFAULT_OSRM, countryCodes: '', serviceMin: 8 }
 }
 
 function installerLanguage(): string | undefined {
