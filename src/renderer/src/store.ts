@@ -33,7 +33,7 @@ export const useUi = create<UiState>((set, get) => ({
   app: null,
   view: 'map',
   settingsOpen: false,
-  settingsTab: 'models',
+  settingsTab: 'cli',
   focusVehicle: null,
   sidebarOpen: true,
   toasts: [],
@@ -64,7 +64,7 @@ export const useUi = create<UiState>((set, get) => ({
     set({ app: { ...app, active: { ...app.active, messages } } })
   },
   setView: (view) => set({ view }),
-  openSettings: (tab = 'models') => set({ settingsOpen: true, settingsTab: tab }),
+  openSettings: (tab = 'cli') => set({ settingsOpen: true, settingsTab: tab }),
   closeSettings: () => set({ settingsOpen: false }),
   setFocusVehicle: (focusVehicle) => set({ focusVehicle }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),

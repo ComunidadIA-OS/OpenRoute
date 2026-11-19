@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { windowsCliCandidates, windowsCliEnvironment } from './windows-cli'
+import { windowsCliCandidates, windowsCliEnvironment, windowsCliLaunchScript } from './windows-cli'
 
 describe('detecta los terminales de Windows', () => {
   const env = {
@@ -22,6 +22,23 @@ describe('detecta los terminales de Windows', () => {
 
   it('solo considera ejecutables locales y absolutos y deduplica el PATH', () => {
     expect(windowsCliCandidates('claude', { Path: env.Path })).toEqual(['D:\\Programas de Ana\\claude.exe'])
+  })
+})
+
+describe('arranque del asistente', () => {
+  it('abre cada inicio de sesión oficial sin añadir el resumen', () => {
+    expect(windowsCliLaunchScript('codex', 'sign-in', false)).toContain("-ArgumentList 'login'")
+    expect(windowsCliLaunchScript('claude', 'sign-in', false)).toContain("-ArgumentList 'auth login'")
+    expect(windowsCliLaunchScript('agy', 'sign-in', false)).not.toContain('-ArgumentList')
+  })
+
+  it('usa una instrucción fija para abrir el archivo de resumen solo si se eligió', () => {
+    expect(windowsCliLaunchScript('codex', 'open', false)).not.toContain('-ArgumentList')
+    expect(windowsCliLaunchScript('codex', 'open', true)).toContain('-ArgumentList \'"Read resumen.txt')
+    expect(windowsCliLaunchScript('claude', 'open', true)).toContain('-ArgumentList \'"Read resumen.txt')
+    expect(windowsCliLaunchScript('agy', 'open', true)).toContain(
+      '-ArgumentList \'--prompt-interactive "Read resumen.txt'
+    )
   })
 })
 

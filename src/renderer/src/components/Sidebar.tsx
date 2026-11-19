@@ -1,4 +1,4 @@
-import { CircleCheck, PanelLeftClose, Search, Settings, SquarePen, Trash2, Truck } from 'lucide-react'
+import { CircleCheck, PanelLeftClose, Search, Settings, SquarePen, Terminal, Trash2, Truck } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PROVIDERS } from '@shared/types'
 import { cn, relativeTime } from '../lib/format'
@@ -107,7 +107,14 @@ export function Sidebar() {
           <span className="ml-auto text-[11.5px] text-tx-3">{app.vehicles.length}</span>
         </button>
         <button
-          onClick={() => openSettings('models')}
+          onClick={() => openSettings('cli')}
+          className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-tx-2 hover:bg-bg-2 hover:text-tx"
+        >
+          <Terminal size={15} />
+          {t('Usar mi suscripción')}
+        </button>
+        <button
+          onClick={() => openSettings()}
           className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] text-tx-2 hover:bg-bg-2 hover:text-tx"
         >
           <Settings size={15} />

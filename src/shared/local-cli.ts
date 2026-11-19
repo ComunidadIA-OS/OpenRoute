@@ -1,29 +1,31 @@
 export const LOCAL_CLIS = [
   {
     id: 'codex',
-    name: 'Codex CLI',
-    signIn: 'Elige «Iniciar sesión con ChatGPT» en el terminal.',
+    name: 'ChatGPT (Codex)',
+    signIn: 'Si es tu primera vez, inicia sesión con ChatGPT en tu navegador.',
     installUrl: 'https://developers.openai.com/codex/cli'
   },
   {
-    id: 'agy',
-    name: 'Antigravity CLI (agy)',
-    signIn: 'Sigue el inicio de sesión con Google en el terminal.',
-    installUrl: 'https://antigravity.google/docs/cli/tutorial/'
+    id: 'claude',
+    name: 'Claude (Claude Code)',
+    signIn: 'Si es tu primera vez, inicia sesión con Claude en tu navegador.',
+    installUrl: 'https://code.claude.com/docs/en/setup'
   },
   {
-    id: 'claude',
-    name: 'Claude Code',
-    signIn: 'Inicia sesión en Claude Code con tu cuenta de Claude.',
-    installUrl: 'https://code.claude.com/docs/en/setup'
+    id: 'agy',
+    name: 'Google (Antigravity)',
+    signIn: 'Si Antigravity te pide iniciar sesión, elige tu cuenta de Google.',
+    installUrl: 'https://antigravity.google/docs/getting-started?tab=cli'
   }
 ] as const
 
 export type LocalCliId = (typeof LOCAL_CLIS)[number]['id']
+export type LocalCliAction = 'open' | 'sign-in'
 
 export interface LocalCliStatus {
   id: LocalCliId
   installed: boolean
+  signedIn?: boolean
 }
 
 export type LocalCliList = { supported: false } | { supported: true; clients: LocalCliStatus[] }

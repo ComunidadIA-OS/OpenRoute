@@ -1,7 +1,7 @@
 import { ExternalLink, LoaderCircle, Terminal } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { cliSummary } from '@core/cli-summary'
-import { LOCAL_CLIS, type LocalCliId, type LocalCliList } from '@shared/local-cli'
+import { LOCAL_CLIS, type LocalCliAction, type LocalCliId, type LocalCliList } from '@shared/local-cli'
 import { api, useUi } from '../store'
 
 import { useI18n } from '../lib/i18n'
@@ -11,9 +11,13 @@ const button = 'rounded-lg border border-line-2 px-3 py-1.5 text-[12px] text-tx 
 export function CliTab() {
   const { t, language, detail } = useI18n()
   const active = useUi((s) => s.app?.active)
+  const openSettings = useUi((s) => s.openSettings)
   const toast = useUi((s) => s.toast)
   const [list, setList] = useState<LocalCliList | 'error' | null>(null)
-  const [launching, setLaunching] = useState<LocalCliId | null>(null)
+  const [launching, setLaunching] = useState<{ id: LocalCliId; action: LocalCliAction } | null>(null)
+  const [selectedSummary, setSelectedSummary] = useState<string | null>(null)
+  const summary = active && active.orders.length > 0 ? cliSummary(active.orders.length, active.plan, language) : null
+  const includeSummary = summary !== null && selectedSummary === summary
 
   function refresh(): void {
     setList(null)
@@ -21,15 +25,26 @@ export function CliTab() {
   }
 
   useEffect(() => {
-    void api.listLocalClis().then(setList, () => setList('error'))
+    const update = (): void => {
+      void api.listLocalClis().then(setList, () => setList('error'))
+    }
+    update()
+    window.addEventListener('focus', update)
+    return () => window.removeEventListener('focus', update)
   }, [])
 
-  async function launch(id: LocalCliId): Promise<void> {
-    setLaunching(id)
+  async function launch(id: LocalCliId, action: LocalCliAction): Promise<void> {
+    setLaunching({ id, action })
     try {
-      const result = await api.launchLocalCli(id)
-      if (result.ok) toast(t('Terminal abierto'), 'ok')
-      else toast(detail(result.error), 'error')
+      const result = await api.launchLocalCli(
+        id,
+        action,
+        action === 'open' && includeSummary ? (summary ?? undefined) : undefined
+      )
+      if (result.ok) {
+        toast(t('Terminal abierto'), 'ok')
+        if (action === 'open') setSelectedSummary(null)
+      } else toast(detail(result.error), 'error')
     } catch {
       toast(t('No se pudo abrir el terminal.'), 'error')
     } finally {
@@ -37,17 +52,16 @@ export function CliTab() {
     }
   }
 
-  const summary = active && active.orders.length > 0 ? cliSummary(active.orders.length, active.plan, language) : null
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="flex items-center gap-2 text-[15px] font-semibold text-tx">
-            <Terminal size={17} aria-hidden="true" /> {t('Terminales de IA')}
+            <Terminal size={17} aria-hidden="true" /> {t('Usar mi suscripción')}
           </h2>
           <p className="mt-1 text-[12px] text-tx-2">
             {t(
-              'Usa tu suscripción en el terminal oficial del proveedor, en una ventana aparte. Para el chat integrado, elige una conexión en Modelos de IA. La cuenta de OpenRoute se gestiona en Cuenta.'
+              'Usa ChatGPT, Claude o Google en el asistente oficial de Windows, que se abre en una ventana aparte. El proveedor aplica los límites de tu plan.'
             )}
           </p>
         </div>
@@ -72,28 +86,80 @@ export function CliTab() {
       )}
       {list && list !== 'error' && list.supported && (
         <>
+          {summary && (
+            <details className="rounded-xl border border-line p-3">
+              <summary className="cursor-pointer text-[13px] font-medium text-tx">
+                {t('Vista previa del resumen del reparto')}
+              </summary>
+              <p className="my-2 text-[12px] text-tx-2">
+                {t(
+                  'El resumen incluye los totales del reparto. Si lo marcas, el asistente podrá leerlo al abrirse y enviarlo al proveedor.'
+                )}
+              </p>
+              <textarea
+                aria-label={t('Resumen del reparto')}
+                readOnly
+                className="w-full rounded-lg border border-line bg-bg-1 p-2 text-[12px] text-tx"
+                rows={5}
+                value={summary}
+              />
+              <label className="mt-2 flex items-center gap-2 text-[12px] text-tx">
+                <input
+                  type="checkbox"
+                  checked={includeSummary}
+                  onChange={(event) => setSelectedSummary(event.target.checked ? summary : null)}
+                />
+                {t('Incluir este resumen al abrir el asistente')}
+              </label>
+            </details>
+          )}
           <div className="divide-y divide-line rounded-xl border border-line">
             {LOCAL_CLIS.map((cli) => {
-              const installed = list.clients.some((client) => client.id === cli.id && client.installed)
+              const client = list.clients.find((client) => client.id === cli.id)
+              const installed = client?.installed
+              const signedIn = client?.signedIn === true
               return (
                 <div key={cli.id} className="flex items-start justify-between gap-3 p-3">
                   <div>
                     <h3 className="text-[13px] font-medium text-tx">{cli.name}</h3>
                     <p className="text-[12px] text-tx-2">
-                      {installed ? t('Instalado') : t('Ejecutable nativo sin detectar')}
+                      {signedIn
+                        ? t('Sesión iniciada')
+                        : installed
+                          ? t('Instalado')
+                          : t('Instala el asistente para continuar')}
                     </p>
-                    {installed && <p className="mt-1 text-[12px] text-tx-3">{t(cli.signIn)}</p>}
+                    {installed && !signedIn && <p className="mt-1 text-[12px] text-tx-2">{t(cli.signIn)}</p>}
                   </div>
                   {installed ? (
-                    <button
-                      className={`${button} shrink-0`}
-                      type="button"
-                      disabled={launching !== null}
-                      onClick={() => void launch(cli.id)}
-                      aria-label={t('Abrir {0} en el terminal', cli.name)}
-                    >
-                      {launching === cli.id ? t('Abriendo…') : t('Abrir terminal')}
-                    </button>
+                    <div className="flex flex-wrap justify-end gap-1.5">
+                      {cli.id !== 'agy' && !signedIn && (
+                        <button
+                          className={button}
+                          type="button"
+                          disabled={launching !== null}
+                          onClick={() => void launch(cli.id, 'sign-in')}
+                          aria-label={t('Iniciar sesión en {0}', cli.name)}
+                        >
+                          {launching?.id === cli.id && launching.action === 'sign-in'
+                            ? t('Abriendo…')
+                            : t('Iniciar sesión')}
+                        </button>
+                      )}
+                      <button
+                        className={button}
+                        type="button"
+                        disabled={launching !== null}
+                        onClick={() => void launch(cli.id, 'open')}
+                        aria-label={t('Abrir {0} en el terminal', cli.name)}
+                      >
+                        {launching?.id === cli.id && launching.action === 'open'
+                          ? t('Abriendo…')
+                          : includeSummary
+                            ? t('Abrir con resumen')
+                            : t('Abrir asistente')}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -109,37 +175,19 @@ export function CliTab() {
             })}
           </div>
           <p className="text-[12px] text-tx-2">
-            {t('Cada terminal se abre en una carpeta vacía. Tú decides qué escribes o pegas.')}
+            {t('Cada asistente se abre en una carpeta propia y usa la sesión que tú iniciaste con su proveedor.')}
           </p>
-          {summary && (
-            <details className="rounded-xl border border-line p-3">
-              <summary className="cursor-pointer text-[13px] font-medium text-tx">
-                {t('Resumen para Codex o Antigravity')}
-              </summary>
-              <p className="my-2 text-[12px] text-tx-2">{t('Revisa estos totales antes de copiarlos al terminal.')}</p>
-              <textarea
-                aria-label={t('Resumen del reparto')}
-                readOnly
-                className="w-full rounded-lg border border-line bg-bg-1 p-2 text-[12px] text-tx"
-                rows={5}
-                value={summary}
-              />
-              <button
-                type="button"
-                className={`${button} mt-2`}
-                onClick={() => {
-                  void navigator.clipboard.writeText(summary).then(
-                    () => toast(t('Resumen copiado'), 'ok'),
-                    () => toast(t('No se pudo copiar el resumen.'), 'error')
-                  )
-                }}
-              >
-                {t('Copiar resumen')}
-              </button>
-            </details>
-          )}
         </>
       )}
+      <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3 text-[12px] text-tx-2">
+        {t('El chat integrado requiere una conexión de IA propia.')}
+        <button type="button" className={button} onClick={() => openSettings('models')}>
+          {t('Configurar chat integrado')}
+        </button>
+      </div>
+      <p className="text-[12px] text-tx-2">
+        {t('Puedes gestionar el acceso de Google a OpenRoute en Cuenta de OpenRoute.')}
+      </p>
     </div>
   )
 }

@@ -1,9 +1,8 @@
-import { ArrowUp, Check, ChevronDown, LoaderCircle, Paperclip, Square, X } from 'lucide-react'
+import { ArrowUp, Check, LoaderCircle, Paperclip, Settings2, Square, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { ChatMessage, ChatPart } from '@shared/types'
-import { PROVIDERS } from '@shared/types'
 import { cn } from '../lib/format'
 import { api, useUi } from '../store'
 import { Isotipo } from './Logo'
@@ -101,80 +100,20 @@ function Message({ m, streaming }: { m: ChatMessage; streaming: boolean }) {
   )
 }
 
-function ModelPicker() {
+function ChatSettings() {
   const { t } = useI18n()
-  const app = useUi((s) => s.app)!
+  const model = useUi((s) => s.app?.settings.activeModel)
   const openSettings = useUi((s) => s.openSettings)
-  const [open, setOpen] = useState(false)
-  const [lists, setLists] = useState<Record<string, string[]>>({})
-  const model = app.settings.activeModel
-  const configured = PROVIDERS.filter((p) =>
-    p.needsKey ? app.settings.providers[p.id]?.hasKey : p.id === 'ollama' || app.settings.providers[p.id]?.baseURL
-  )
-
-  useEffect(() => {
-    if (!open) return
-    configured.forEach((p) => {
-      if (lists[p.id]) return
-      api.listModels(p.id).then((r) => setLists((l) => ({ ...l, [p.id]: r.models.slice(0, 8) })))
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
 
   return (
-    <div className="relative">
-      <button
-        onClick={() => (configured.length ? setOpen((o) => !o) : openSettings('models'))}
-        className="flex max-w-[210px] items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-tx-2 hover:bg-bg-3 hover:text-tx"
-      >
-        {model ? <ProviderIcon id={model.provider} size={13} /> : null}
-        <span className="truncate">{model ? model.model : t('Elegir modelo')}</span>
-        <ChevronDown size={12} />
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="panel absolute bottom-9 right-0 z-40 max-h-[340px] w-[290px] overflow-y-auto rounded-xl p-1.5 shadow-2xl">
-            {configured.map((p) => (
-              <div key={p.id} className="pb-1">
-                <div className="flex items-center gap-1.5 px-2 pb-1 pt-1.5 text-[11.5px] text-tx-3">
-                  <ProviderIcon id={p.id} size={12} /> {p.id === 'custom' ? t('Compatible con OpenAI') : p.name}
-                </div>
-                {(lists[p.id] ?? []).map((m) => {
-                  const on = model?.provider === p.id && model.model === m
-                  return (
-                    <button
-                      key={m}
-                      onClick={() => {
-                        api.saveSettings({ activeModel: { provider: p.id, model: m } })
-                        setOpen(false)
-                      }}
-                      className={cn(
-                        'flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-[12.5px]',
-                        on ? 'bg-ac-soft text-tx' : 'text-tx-2 hover:bg-bg-3 hover:text-tx'
-                      )}
-                    >
-                      <span className="truncate">{m}</span>
-                      {on && <Check size={13} className="text-ac" />}
-                    </button>
-                  )
-                })}
-                {!lists[p.id] && <div className="px-2 py-1 text-[12px] text-tx-3">{t('Cargando…')}</div>}
-              </div>
-            ))}
-            <button
-              onClick={() => {
-                setOpen(false)
-                openSettings('models')
-              }}
-              className="mt-1 w-full rounded-lg border-t border-line px-2 py-2 text-left text-[12.5px] text-tx-2 hover:text-tx"
-            >
-              {t('Configurar modelos…')}
-            </button>
-          </div>
-        </>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => openSettings(model ? 'models' : 'cli')}
+      className="flex max-w-[210px] items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] text-tx-2 hover:bg-bg-3 hover:text-tx"
+    >
+      {model ? <ProviderIcon id={model.provider} size={13} /> : <Settings2 size={13} />}
+      <span className="truncate">{model ? model.model : t('Configurar IA')}</span>
+    </button>
   )
 }
 
@@ -206,7 +145,7 @@ export function Chat() {
     const v = value.trim()
     if (!v || running) return
     if (!app.settings.activeModel) {
-      openSettings('models')
+      openSettings('cli')
       return
     }
     setText('')
@@ -244,12 +183,22 @@ export function Chat() {
               ))}
             </div>
             {!app.settings.activeModel && (
-              <button
-                onClick={() => openSettings('models')}
-                className="mt-5 flex items-center gap-2 rounded-full bg-ac px-4 py-2 text-[13px] font-semibold text-ac-ink hover:brightness-105"
-              >
-                {t('Conecta tu modelo')}
-              </button>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => openSettings('cli')}
+                  className="rounded-full bg-ac px-4 py-2 text-[13px] font-semibold text-ac-ink hover:brightness-105"
+                >
+                  {t('Usar mi suscripción')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openSettings('models')}
+                  className="rounded-full px-3 py-2 text-[13px] text-tx-2 hover:bg-bg-2 hover:text-tx"
+                >
+                  {t('Configurar chat integrado')}
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -287,7 +236,7 @@ export function Chat() {
               <Paperclip size={15} />
             </button>
             <div className="flex items-center gap-1">
-              <ModelPicker />
+              <ChatSettings />
               {running ? (
                 <button
                   onClick={() => api.stopChat()}
